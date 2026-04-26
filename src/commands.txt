@@ -1,0 +1,8 @@
+Object.values(Game.creeps)
+    .filter(c => c.memory.role === 'expedition')
+    .map(c => `${c.name} -> ${c.memory.targetRoom} (${c.ticksToLive} ttl)`)
+    .join(', ')
+
+
+Game.cpu.bucket
+

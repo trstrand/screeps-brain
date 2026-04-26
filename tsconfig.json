@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "lib": ["ESNext", "DOM"],
+    "types": ["screeps"],
+    "noEmit": true // Node 24 & Vite handle the output; TSC just checks for errors
+  },
+  "include": ["src/**/*.ts"]
+}

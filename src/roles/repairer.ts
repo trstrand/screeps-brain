@@ -1,0 +1,127 @@
+import { COLONY_SETTINGS } from '../config.creeps';
+
+export const roleRepairer: RoleHandler = {
+    run(creep: Creep): void {
+        // 1. State Toggle
+        if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) {
+            creep.memory.working = false;
+            delete (creep.memory as any).repairTargetId; // Clear target when empty
+            creep.say('🔍 Energy');
+        }
+        if (!creep.memory.working && creep.store.getFreeCapacity() === 0) {
+            creep.memory.working = true;
+            creep.say('🔧 Repair');
+        }
+
+        // 2. Work Phase
+        if (creep.memory.working) {
+            // 2. LOGISTICS: Home Room Guard
+            const homeRoom = creep.memory.homeRoom;
+            if (homeRoom && creep.room.name !== homeRoom) {
+                creep.moveTo(new RoomPosition(25, 25, homeRoom), { range: 5 });
+                return;
+            }
+
+            // --- SETTINGS ---
+            const wallMaxHits = (COLONY_SETTINGS.roomWallMaxHits && COLONY_SETTINGS.roomWallMaxHits[creep.room.name]) || COLONY_SETTINGS.wallMaxHits;
+            const rampartMaxHits = (COLONY_SETTINGS.roomRampartMaxHits && COLONY_SETTINGS.roomRampartMaxHits[creep.room.name]) || COLONY_SETTINGS.rampartMaxHits;
+
+            // --- TARGET SELECTION ---
+            let target = Game.getObjectById((creep.memory as any).repairTargetId as Id<Structure>);
+
+            // If target is fully repaired or gone, find a new one
+            if (!target || target.hits === target.hitsMax || 
+               (target.structureType === STRUCTURE_WALL && target.hits >= wallMaxHits) ||
+               (target.structureType === STRUCTURE_RAMPART && target.hits >= rampartMaxHits)) {
+                
+                delete (creep.memory as any).repairTargetId;
+
+                // Priority 1: Emergency (Containers/Roads < 50%)
+                target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+                    filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_ROAD) && 
+                                    s.hits < s.hitsMax * 0.5
+                });
+
+                // Priority 1.5: Core Infrastructure (Spawns, Extensions, Towers, etc)
+                if (!target) {
+                    target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+                        filter: (s) => (s.structureType !== STRUCTURE_ROAD && 
+                                        s.structureType !== STRUCTURE_CONTAINER && 
+                                        s.structureType !== STRUCTURE_WALL && 
+                                        s.structureType !== STRUCTURE_RAMPART) && 
+                                        s.hits < s.hitsMax
+                    });
+                }
+
+                // Priority 2: Standard (Containers/Roads < 90%)
+                if (!target) {
+                    target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+                        filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_ROAD) && 
+                                        s.hits < s.hitsMax * 0.9
+                    });
+                }
+
+                // Priority 3: Defenses (Walls/Ramparts)
+                if (!target) {
+                    target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+                        filter: (s) => (s.structureType === STRUCTURE_WALL && s.hits < wallMaxHits) ||
+                                       (s.structureType === STRUCTURE_RAMPART && s.hits < rampartMaxHits)
+                    });
+                }
+
+                if (target) (creep.memory as any).repairTargetId = target.id;
+            }
+
+            // --- EXECUTION ---
+            if (target) {
+                if (creep.repair(target) === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(target, { visualizePathStyle: { stroke: '#ff0000' }, reusePath: 10 });
+                }
+            } else {
+                if (creep.room.controller) {
+                    if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
+                        creep.moveTo(creep.room.controller, { range: 3 });
+                    }
+                }
+            }
+        } 
+        
+        // 3. Refill Phase
+        else {
+            // Priority 1: Loot (Tombstones, Ruins, Dropped)
+            const loot = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
+                filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 20
+            }) || creep.pos.findClosestByRange(FIND_TOMBSTONES, {
+                filter: t => t.store[RESOURCE_ENERGY] > 0
+            }) || creep.pos.findClosestByRange(FIND_RUINS, {
+                filter: r => r.store[RESOURCE_ENERGY] > 0
+            });
+
+            if (loot) {
+                const action = ('amount' in loot) ? creep.pickup(loot as Resource) : creep.withdraw(loot as Tombstone | Ruin, RESOURCE_ENERGY);
+                if (action === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(loot, { visualizePathStyle: { stroke: '#ffaa00' } });
+                }
+                return;
+            }
+
+            // Priority 2: Structured Energy (Containers/Storage)
+            const energySource = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+                filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_STORAGE) &&
+                                s.store.getUsedCapacity(RESOURCE_ENERGY) > 0
+            });
+
+            if (energySource) {
+                if (creep.withdraw(energySource, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(energySource, { visualizePathStyle: { stroke: '#ffaa00' } });
+                }
+            } else {
+                // Priority 3: Last Resort (Harvest)
+                const source = creep.pos.findClosestByRange(FIND_SOURCES_ACTIVE);
+                if (source && creep.harvest(source) === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(source);
+                }
+            }
+        }
+    }
+};
