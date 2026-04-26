@@ -79,7 +79,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             upgradeHauler: 1,
             upgrader: 2,
             builder: 0,
-            repairer: 0,
+            repairer: 1,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
@@ -101,7 +101,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             upgradeHauler: 2,
             upgrader: 2,
             builder: 0,
-            repairer: 0,
+            repairer: 1,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
@@ -114,6 +114,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             remoteBuilder: 0,
             claimer: 0
         },
+        //E58S57 is the main room for spawning remote creeps
         "E58S57": {
             defender: 0,
             miner: 2,
@@ -145,7 +146,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             upgradeHauler: 2,
             upgrader: 2,
             builder: 0,
-            repairer: 0,
+            repairer: 1,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
