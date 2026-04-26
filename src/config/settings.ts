@@ -17,7 +17,7 @@ export const COLONY_SETTINGS: ColonySettings = {
     attackWalls: false,
     attackRamparts: false,
     //wall and rampart repair settings
-    wallMaxHits: 1000,
+    wallMaxHits: 1002,
     rampartMaxHits: 1000,
     roomWallMaxHits: {
         "E59S58": 25e4,
