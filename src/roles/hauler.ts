@@ -176,6 +176,17 @@ export const roleHauler: RoleHandler = {
                         if (needsEnergy) target = creep.room.storage;
                     }
 
+                    // Priority 4: Controller Container Emergency Fallback
+                    // Only take from controller containers if Spawns/Extensions need energy and everything else is empty
+                    if (!target && this.roomSpawnsNeedEnergy(creep.room)) {
+                        target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+                            filter: (s) => s.structureType === STRUCTURE_CONTAINER &&
+                                s.store[RESOURCE_ENERGY] > 400 && 
+                                (creep.room.controller && s.pos.inRangeTo(creep.room.controller, 4))
+                        });
+                        if (target) creep.say('🆘 Emerg');
+                    }
+
                     if (target) {
                         creep.memory.targetId = target.id;
                     } else {
@@ -253,6 +264,16 @@ export const roleHauler: RoleHandler = {
                 }
                 return false;
             }
+        }).length > 0;
+    },
+
+    /**
+     * Specific check for Spawns and Extensions
+     */
+    roomSpawnsNeedEnergy(room: Room): boolean {
+        return room.find(FIND_MY_STRUCTURES, {
+            filter: (s) => (s.structureType === STRUCTURE_EXTENSION || s.structureType === STRUCTURE_SPAWN) &&
+                           s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
         }).length > 0;
     }
 };

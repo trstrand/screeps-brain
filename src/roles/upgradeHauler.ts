@@ -33,7 +33,8 @@ export const roleUpgradeHauler: RoleHandler = {
             const controller = creep.room.controller;
             if (!controller) return;
 
-            const targets = controller.pos.findInRange(FIND_STRUCTURES, 3, {
+            // Targets are containers DIRECTLY next to controller (range 1)
+            const targets = controller.pos.findInRange(FIND_STRUCTURES, 1, {
                 filter: (s) => s.structureType === STRUCTURE_CONTAINER
             }) as StructureContainer[];
 
@@ -81,7 +82,7 @@ export const roleUpgradeHauler: RoleHandler = {
             if (!target) {
                 // Priority A: Minerals (Only if not already carrying energy)
                 if (!hasEnergy) {
-                    const mineralCandidates: (Resource | StructureContainer)[] = [
+                    const mineralCandidates: (Resource | StructureContainer | Tombstone | Ruin)[] = [
                         ...creep.room.find(FIND_DROPPED_RESOURCES, {
                             filter: r => r.resourceType !== RESOURCE_ENERGY && 
                                          r.pos.findInRange(FIND_MINERALS, 3).length > 0
@@ -90,30 +91,50 @@ export const roleUpgradeHauler: RoleHandler = {
                             filter: (s: StructureContainer) => s.structureType === STRUCTURE_CONTAINER &&
                                          s.store.getUsedCapacity() > 100 &&
                                          s.pos.findInRange(FIND_MINERALS, 3).length > 0
-                        }) as StructureContainer[]
+                        }) as StructureContainer[],
+                        ...creep.room.find(FIND_TOMBSTONES, {
+                            filter: t => Object.keys(t.store).some(r => r !== RESOURCE_ENERGY && t.store[r as ResourceConstant] > 0)
+                        }),
+                        ...creep.room.find(FIND_RUINS, {
+                            filter: r => Object.keys(r.store).some(res => res !== RESOURCE_ENERGY && r.store[res as ResourceConstant] > 0)
+                        })
                     ];
 
-                    target = creep.pos.findClosestByPath(mineralCandidates);
+                    target = creep.pos.findClosestByRange(mineralCandidates);
                 }
 
                 // Priority B: Energy (Only if not already carrying minerals)
                 if (!target && !hasMinerals) {
-                    const energySources = creep.room.find(FIND_STRUCTURES, {
-                        filter: (s) => {
-                            // Storage is always a valid source if it has energy
-                            if (s.structureType === STRUCTURE_STORAGE) {
-                                return s.store[RESOURCE_ENERGY] > 0;
+                    const energySources = [
+                        ...creep.room.find(FIND_DROPPED_RESOURCES, {
+                            filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 50
+                        }),
+                        ...creep.room.find(FIND_TOMBSTONES, {
+                            filter: t => t.store[RESOURCE_ENERGY] > 50
+                        }),
+                        ...creep.room.find(FIND_RUINS, {
+                            filter: r => r.store[RESOURCE_ENERGY] > 50
+                        }),
+                        ...creep.room.find(FIND_STRUCTURES, {
+                            filter: (s) => {
+                                // Storage is always a valid source if it has energy
+                                if (s.structureType === STRUCTURE_STORAGE) {
+                                    return s.store[RESOURCE_ENERGY] > 0;
+                                }
+                                // Containers are valid if they have energy and AREN'T the controller containers
+                                // Controller containers are defined as range 1 (directly next to controller)
+                                if (s.structureType === STRUCTURE_CONTAINER) {
+                                    const isControllerContainer = creep.room.controller && s.pos.inRangeTo(creep.room.controller, 1);
+                                    const isSourceContainer = s.pos.findInRange(FIND_SOURCES, 2).length > 0;
+                                    
+                                    return s.store[RESOURCE_ENERGY] > 100 && (isSourceContainer || !isControllerContainer);
+                                }
+                                return false;
                             }
-                            // Containers are valid if they have energy and AREN'T the controller containers
-                            if (s.structureType === STRUCTURE_CONTAINER) {
-                                return s.store[RESOURCE_ENERGY] > 200 &&
-                                       (creep.room.controller ? s.pos.getRangeTo(creep.room.controller) > 4 : true);
-                            }
-                            return false;
-                        }
-                    }) as (StructureStorage | StructureContainer)[];
+                        }) as (StructureStorage | StructureContainer)[]
+                    ];
 
-                    target = creep.pos.findClosestByPath(energySources);
+                    target = creep.pos.findClosestByRange(energySources);
                 }
 
                 if (target) {
@@ -126,6 +147,7 @@ export const roleUpgradeHauler: RoleHandler = {
                     if ('amount' in target) {
                         creep.pickup(target);
                     } else {
+                        // Withdraw minerals if any, otherwise energy
                         const resourceToWithdraw = Object.keys(target.store).find(r => target.store[r as ResourceConstant] > 0) as ResourceConstant || RESOURCE_ENERGY;
                         creep.withdraw(target, resourceToWithdraw);
                     }
