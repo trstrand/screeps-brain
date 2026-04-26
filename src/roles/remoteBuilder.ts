@@ -1,4 +1,4 @@
-import { COLONY_SETTINGS } from '../config.creeps';
+import { COLONY_SETTINGS } from '../config/settings';
 
 export const roleRemoteBuilder: RoleHandler = {
     run(creep: Creep): void {
@@ -83,7 +83,7 @@ export const roleRemoteBuilder: RoleHandler = {
                     ...creep.room.find(FIND_DROPPED_RESOURCES, { filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 50 })
                 ];
 
-                target = creep.pos.findClosestByPath(candidates);
+                target = creep.pos.findClosestByRange(candidates);
                 if (target) {
                     creep.memory.targetId = target.id;
                 }
@@ -99,7 +99,7 @@ export const roleRemoteBuilder: RoleHandler = {
                 }
             } else {
                 // FALLBACK: Harvest
-                const source = creep.pos.findClosestByPath(FIND_SOURCES_ACTIVE, {
+                const source = creep.pos.findClosestByRange(FIND_SOURCES_ACTIVE, {
                     filter: (s) => !COLONY_SETTINGS.ignoredSources.includes(s.id as any)
                 });
                 

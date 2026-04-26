@@ -1,4 +1,4 @@
-import { COLONY_SETTINGS } from '../config.creeps';
+import { COLONY_SETTINGS } from '../config/settings';
 
 export const roleRepairer: RoleHandler = {
     run(creep: Creep): void {
@@ -35,41 +35,50 @@ export const roleRepairer: RoleHandler = {
                (target.structureType === STRUCTURE_RAMPART && target.hits >= rampartMaxHits)) {
                 
                 delete (creep.memory as any).repairTargetId;
+                target = null;
 
-                // Priority 1: Emergency (Containers/Roads < 50%)
-                target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
-                    filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_ROAD) && 
-                                    s.hits < s.hitsMax * 0.5
-                });
-
-                // Priority 1.5: Core Infrastructure (Spawns, Extensions, Towers, etc)
-                if (!target) {
-                    target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
-                        filter: (s) => (s.structureType !== STRUCTURE_ROAD && 
-                                        s.structureType !== STRUCTURE_CONTAINER && 
-                                        s.structureType !== STRUCTURE_WALL && 
-                                        s.structureType !== STRUCTURE_RAMPART) && 
-                                        s.hits < s.hitsMax
-                    });
-                }
-
-                // Priority 2: Standard (Containers/Roads < 90%)
-                if (!target) {
+                if (creep.memory.idleTicks && creep.memory.idleTicks > 0) {
+                    creep.memory.idleTicks--;
+                } else {
+                    // Priority 1: Emergency (Containers/Roads < 50%)
                     target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
                         filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_ROAD) && 
-                                        s.hits < s.hitsMax * 0.9
+                                        s.hits < s.hitsMax * 0.5
                     });
-                }
 
-                // Priority 3: Defenses (Walls/Ramparts)
-                if (!target) {
-                    target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
-                        filter: (s) => (s.structureType === STRUCTURE_WALL && s.hits < wallMaxHits) ||
-                                       (s.structureType === STRUCTURE_RAMPART && s.hits < rampartMaxHits)
-                    });
-                }
+                    // Priority 1.5: Core Infrastructure (Spawns, Extensions, Towers, etc)
+                    if (!target) {
+                        target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+                            filter: (s) => (s.structureType !== STRUCTURE_ROAD && 
+                                            s.structureType !== STRUCTURE_CONTAINER && 
+                                            s.structureType !== STRUCTURE_WALL && 
+                                            s.structureType !== STRUCTURE_RAMPART) && 
+                                            s.hits < s.hitsMax
+                        });
+                    }
 
-                if (target) (creep.memory as any).repairTargetId = target.id;
+                    // Priority 2: Standard (Containers/Roads < 90%)
+                    if (!target) {
+                        target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+                            filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_ROAD) && 
+                                            s.hits < s.hitsMax * 0.9
+                        });
+                    }
+
+                    // Priority 3: Defenses (Walls/Ramparts)
+                    if (!target) {
+                        target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+                            filter: (s) => (s.structureType === STRUCTURE_WALL && s.hits < wallMaxHits) ||
+                                           (s.structureType === STRUCTURE_RAMPART && s.hits < rampartMaxHits)
+                        });
+                    }
+
+                    if (target) {
+                        (creep.memory as any).repairTargetId = target.id;
+                    } else {
+                        creep.memory.idleTicks = 10;
+                    }
+                }
             }
 
             // --- EXECUTION ---

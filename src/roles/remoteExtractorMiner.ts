@@ -20,6 +20,12 @@ export const roleRemoteExtractorMiner: RoleHandler = {
             return;
         }
 
+        if (mineral.mineralAmount === 0) {
+            creep.say('✅ Empty');
+            creep.memory.recycle = true;
+            return;
+        }
+
         const extractor = mineral.pos.lookFor(LOOK_STRUCTURES).find(s => s.structureType === STRUCTURE_EXTRACTOR) as StructureExtractor;
         
         if (!extractor) {

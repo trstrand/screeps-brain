@@ -1,4 +1,4 @@
-import { COLONY_SETTINGS } from '../config.creeps';
+import { COLONY_SETTINGS } from '../config/settings';
 
 export const roleHauler: RoleHandler = {
     run(creep: Creep): void {
@@ -36,37 +36,52 @@ export const roleHauler: RoleHandler = {
         if (creep.memory.working && creep.store.getUsedCapacity() === 0) {
             creep.memory.working = false;
             delete creep.memory.targetId;
+            delete creep.memory.deliveryTargetId;
             creep.say('🔄 Loading');
         }
 
         if (!creep.memory.working && creep.store.getFreeCapacity() === 0) {
             creep.memory.working = true;
             delete creep.memory.targetId;
+            delete creep.memory.deliveryTargetId;
             creep.say('📦 Deposit');
         }
 
         // --- 2. DELIVERY PHASE ---
         if (creep.memory.working) {
-            // IF CARRYING ENERGY: Normal priority
-            let target: any = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
-                filter: (s) => (s.structureType === STRUCTURE_EXTENSION || s.structureType === STRUCTURE_SPAWN) &&
-                    s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
-            });
-
-            if (!target) {
-                target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
-                    filter: (s) => s.structureType === STRUCTURE_TOWER &&
-                        s.store.getUsedCapacity(RESOURCE_ENERGY) < (s.store.getCapacity(RESOURCE_ENERGY) * 0.5)
-                });
+            let target: any = null;
+            if (creep.memory.deliveryTargetId) {
+                target = Game.getObjectById(creep.memory.deliveryTargetId as Id<any>);
+                if (target && target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                    target = null;
+                    delete creep.memory.deliveryTargetId;
+                }
             }
 
             if (!target) {
+                // IF CARRYING ENERGY: Normal priority
                 target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
-                    filter: (s) => s.structureType === STRUCTURE_TOWER && s.store.getFreeCapacity(RESOURCE_ENERGY) > 100
+                    filter: (s) => (s.structureType === STRUCTURE_EXTENSION || s.structureType === STRUCTURE_SPAWN) &&
+                        s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
                 });
-            }
 
-            if (!target) target = creep.room.storage;
+                if (!target) {
+                    target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
+                        filter: (s) => s.structureType === STRUCTURE_TOWER &&
+                            s.store.getUsedCapacity(RESOURCE_ENERGY) < (s.store.getCapacity(RESOURCE_ENERGY) * 0.5)
+                    });
+                }
+
+                if (!target) {
+                    target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
+                        filter: (s) => s.structureType === STRUCTURE_TOWER && s.store.getFreeCapacity(RESOURCE_ENERGY) > 100
+                    });
+                }
+
+                if (!target) target = creep.room.storage;
+                
+                if (target) creep.memory.deliveryTargetId = target.id;
+            }
 
             if (!target) {
                 const spawn = creep.room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_SPAWN } })[0];
@@ -135,31 +150,37 @@ export const roleHauler: RoleHandler = {
 
             // D. Find New Target Globally
             if (!target) {
-                // Priority 1: Dropped energy near sources (Overflow)
-                const overflowEnergy = creep.room.find(FIND_DROPPED_RESOURCES, {
-                    filter: r => r.resourceType === RESOURCE_ENERGY && 
-                                 r.amount > 50 && // Prioritize smaller overflow
-                                 r.pos.findInRange(FIND_SOURCES, 2).length > 0
-                });
+                if (creep.memory.idleTicks && creep.memory.idleTicks > 0) {
+                    creep.memory.idleTicks--;
+                } else {
+                    // Priority 1: Dropped energy near sources (Overflow)
+                    const overflowEnergy = creep.room.find(FIND_DROPPED_RESOURCES, {
+                        filter: r => r.resourceType === RESOURCE_ENERGY && 
+                                     r.amount > 50 && // Prioritize smaller overflow
+                                     r.pos.findInRange(FIND_SOURCES, 2).length > 0
+                    });
 
-                if (overflowEnergy.length > 0) {
-                    target = creep.pos.findClosestByPath(overflowEnergy);
-                }
+                    if (overflowEnergy.length > 0) {
+                        target = creep.pos.findClosestByRange(overflowEnergy);
+                    }
 
-                // Priority 2: Other candidates (Tombstones, regular dropped, containers)
-                if (!target) {
-                    const candidates = this.getCollectionCandidates(creep);
-                    target = creep.pos.findClosestByPath(candidates);
-                }
+                    // Priority 2: Other candidates (Tombstones, regular dropped, containers)
+                    if (!target) {
+                        const candidates = this.getCollectionCandidates(creep);
+                        target = creep.pos.findClosestByRange(candidates);
+                    }
 
-                // Priority 3: Storage Fallback
-                if (!target && creep.room.storage && creep.room.storage.store[RESOURCE_ENERGY] > 0) {
-                    const needsEnergy = this.roomNeedsEnergy(creep.room);
-                    if (needsEnergy) target = creep.room.storage;
-                }
+                    // Priority 3: Storage Fallback
+                    if (!target && creep.room.storage && creep.room.storage.store[RESOURCE_ENERGY] > 0) {
+                        const needsEnergy = this.roomNeedsEnergy(creep.room);
+                        if (needsEnergy) target = creep.room.storage;
+                    }
 
-                if (target) {
-                    creep.memory.targetId = target.id;
+                    if (target) {
+                        creep.memory.targetId = target.id;
+                    } else {
+                        creep.memory.idleTicks = 5;
+                    }
                 }
             }
 
@@ -184,9 +205,9 @@ export const roleHauler: RoleHandler = {
                 }
             } else {
                 // IDLE
-                const parkTarget = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+                const parkTarget = creep.pos.findClosestByRange(FIND_STRUCTURES, {
                     filter: (s) => s.structureType === STRUCTURE_CONTAINER && s.pos.findInRange(FIND_SOURCES, 2).length > 0
-                }) || creep.pos.findClosestByPath(FIND_SOURCES);
+                }) || creep.pos.findClosestByRange(FIND_SOURCES);
 
                 if (parkTarget) {
                     if (creep.pos.getRangeTo(parkTarget) > 5) {

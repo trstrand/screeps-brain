@@ -1,4 +1,4 @@
-import { COLONY_SETTINGS } from '../config.creeps';
+import { COLONY_SETTINGS } from '../config/settings';
 
 export class LinkManager {
     /**
@@ -19,10 +19,11 @@ export class LinkManager {
         const controllerLink = controller ? controller.pos.findInRange(allLinks, 3)[0] : null;
         const storageLink = storage ? storage.pos.findInRange(allLinks, 3)[0] : null;
 
+        const sources = room.find(FIND_SOURCES);
         const sourceLinks = allLinks.filter(l => 
             l.id !== controllerLink?.id && 
             l.id !== storageLink?.id &&
-            l.pos.findInRange(FIND_SOURCES, 2).length > 0
+            sources.some(s => l.pos.inRangeTo(s, 2))
         );
 
         // 2. Transfer Logic (Source -> Controller -> Storage)

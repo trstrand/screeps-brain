@@ -1,4 +1,4 @@
-import { COLONY_SETTINGS } from '../config.creeps';
+import { COLONY_SETTINGS } from '../config/settings';
 
 export const rolePioneer: RoleHandler = {
     run(creep: Creep): void {
@@ -92,7 +92,7 @@ export const rolePioneer: RoleHandler = {
         if (!target) {
             // --- PRIORITY 0: DISMANTLE PREVIOUS PLAYER EXTENSIONS (Manual Flag) ---
             if (creep.memory.dismantleExtensions && creep.room.name === targetRoom) {
-                target = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+                target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
                     filter: (s) => s.structureType === STRUCTURE_EXTENSION && !((s as any).my)
                 });
                 if (target) {
@@ -114,11 +114,11 @@ export const rolePioneer: RoleHandler = {
 
             // --- PRIORITY 2: DROPPED ENERGY / LOOT ---
             if (!target) {
-                target = creep.pos.findClosestByPath(FIND_DROPPED_RESOURCES, {
+                target = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
                     filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 50
-                }) || creep.pos.findClosestByPath(FIND_TOMBSTONES, {
-                    filter: t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0
-                }) || creep.pos.findClosestByPath(FIND_RUINS, {
+                }) || creep.pos.findClosestByRange(FIND_TOMBSTONES, {
+                    filter: t => t.store[RESOURCE_ENERGY] > 0
+                }) || creep.pos.findClosestByRange(FIND_RUINS, {
                     filter: r => r.store.getUsedCapacity(RESOURCE_ENERGY) > 0
                 });
                 if (target) creep.memory.targetId = target.id;
@@ -126,7 +126,7 @@ export const rolePioneer: RoleHandler = {
 
             // --- PRIORITY 3: STORAGE/CONTAINERS ---
             if (!target) {
-                target = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+                target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
                     filter: (s) => (s.structureType === STRUCTURE_CONTAINER || 
                                 (s.structureType === STRUCTURE_STORAGE && (s as StructureStorage).my)) &&
                                 s.store.getUsedCapacity(RESOURCE_ENERGY) > 200
@@ -136,7 +136,7 @@ export const rolePioneer: RoleHandler = {
 
             // --- PRIORITY 4: HARVEST ---
             if (!target) {
-                target = creep.pos.findClosestByPath(FIND_SOURCES_ACTIVE, {
+                target = creep.pos.findClosestByRange(FIND_SOURCES_ACTIVE, {
                     filter: (s) => !COLONY_SETTINGS.ignoredSources.includes(s.id as any)
                 });
                 if (target) creep.memory.targetId = target.id;
@@ -198,7 +198,7 @@ export const rolePioneer: RoleHandler = {
 
         if (!target) {
             // A. Recharge Spawn/Extensions
-            target = creep.pos.findClosestByPath(FIND_MY_STRUCTURES, {
+            target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
                 filter: (s) => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION) &&
                                 s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
             });
@@ -213,7 +213,7 @@ export const rolePioneer: RoleHandler = {
 
             // C. Construction
             if (!target) {
-                target = creep.pos.findClosestByPath(FIND_CONSTRUCTION_SITES);
+                target = creep.pos.findClosestByRange(FIND_CONSTRUCTION_SITES);
             }
 
             // D. Standard Upgrade
