@@ -9,8 +9,6 @@ export const COLONY_SETTINGS: ColonySettings = {
     ignoredSources: ['none'],
     //dismantle targets and wall/rampart attack settings
     dismantleTargets: {
-        "E57S57": 'none',
-        "E58S57": 'none',
         "E58S58": '6654f475659b91ae40301a05',
         //rooms I want to break into to get to the controller
         "E58S59": '66fea842535f3f45d9e35bc3',
@@ -23,16 +21,11 @@ export const COLONY_SETTINGS: ColonySettings = {
     rampartMaxHits: 1000,
     roomWallMaxHits: {
         "E59S58": 25e4,
-        "E58S58": 1e3,
         "E58S57": 5e4,
         "E57S57": 1e4
     },
     roomRampartMaxHits: {
-        'E59S58': 100000,
-        'E58S58': 1000,
-        'E58S57': 1000,
-        'E57S57': 100
-
+        'E59S58': 1e5
     },
     remoteMining: {
         'E59S58': [], // Example: 'HomeRoom': ['RemoteRoom1', 'RemoteRoom2']
