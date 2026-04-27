@@ -1,4 +1,4 @@
-import { COLONY_SETTINGS } from '../config.creeps';
+import { COLONY_SETTINGS } from '../config/settings';
 
 export const roleUpgrader: RoleHandler = {
     run(creep: Creep): void {
@@ -93,7 +93,7 @@ export const roleUpgrader: RoleHandler = {
                     ...creep.room.find(FIND_TOMBSTONES, { filter: t => t.store[RESOURCE_ENERGY] > 0 })
                 ];
                 
-                const loot = creep.pos.findClosestByPath(lootCandidates);
+                const loot = creep.pos.findClosestByRange(lootCandidates);
 
                 if (loot) {
                     const action = ('amount' in loot) ? creep.pickup(loot as Resource) : creep.withdraw(loot as Tombstone, RESOURCE_ENERGY);
@@ -103,7 +103,7 @@ export const roleUpgrader: RoleHandler = {
                 }
                 // Fallback B: Other storage/containers
                 else {
-                    const backup = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+                    const backup = creep.pos.findClosestByRange(FIND_STRUCTURES, {
                         filter: s => (s.structureType === STRUCTURE_STORAGE || s.structureType === STRUCTURE_CONTAINER) &&
                             s.store[RESOURCE_ENERGY] > 0 && s.id !== upgradeContainer?.id
                     });
@@ -115,7 +115,7 @@ export const roleUpgrader: RoleHandler = {
                     }
                     // Fallback C: Harvest active source
                     else {
-                        const source = creep.pos.findClosestByPath(FIND_SOURCES_ACTIVE, {
+                        const source = creep.pos.findClosestByRange(FIND_SOURCES_ACTIVE, {
                             filter: (s) => !COLONY_SETTINGS.ignoredSources.includes(s.id as any)
                         });
 

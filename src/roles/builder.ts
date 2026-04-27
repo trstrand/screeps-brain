@@ -1,4 +1,4 @@
-import { COLONY_SETTINGS } from '../config.creeps';
+import { COLONY_SETTINGS } from '../config/settings';
 
 /**
  * Builder Role - Optimized for CanMiner setups with Container Maintenance
@@ -118,7 +118,7 @@ export const roleBuilder: RoleHandler = {
                         ...creep.room.find(FIND_DROPPED_RESOURCES, { filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 50 })
                     ];
 
-                    target = creep.pos.findClosestByPath(candidates);
+                    target = creep.pos.findClosestByRange(candidates);
                     if (target) {
                         creep.memory.targetId = target.id;
                     }
@@ -134,15 +134,21 @@ export const roleBuilder: RoleHandler = {
                     creep.moveTo(target, { visualizePathStyle: { stroke: '#ffaa00' }, reusePath: 10 });
                 }
             } else {
-                // FALLBACK: Harvest
-                const sources = creep.room.find(FIND_SOURCES_ACTIVE);
-                const source = creep.pos.findClosestByPath(sources, {
-                    filter: (s) => !COLONY_SETTINGS.ignoredSources.includes(s.id as any)
-                });
-                
-                if (source) {
-                    if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
-                        creep.moveTo(source, { visualizePathStyle: { stroke: '#ffaa00' } });
+                if (creep.memory.idleTicks && creep.memory.idleTicks > 0) {
+                    creep.memory.idleTicks--;
+                } else {
+                    // FALLBACK: Harvest
+                    const sources = creep.room.find(FIND_SOURCES_ACTIVE);
+                    const source = creep.pos.findClosestByRange(sources, {
+                        filter: (s: any) => !COLONY_SETTINGS.ignoredSources.includes(s.id)
+                    });
+                    
+                    if (source) {
+                        if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
+                            creep.moveTo(source, { visualizePathStyle: { stroke: '#ffaa00' } });
+                        }
+                    } else {
+                        creep.memory.idleTicks = 5;
                     }
                 }
             }

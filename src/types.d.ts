@@ -65,6 +65,7 @@ declare global {
         recycle?: boolean;
         targetRoom?: string;
         targetId?: Id<any>;
+        deliveryTargetId?: Id<any>;
         sourceIndex?: number; 
         targetContainerId?: Id<StructureContainer>;
         repairTargetId?: Id<Structure>;
@@ -80,6 +81,7 @@ declare global {
     interface RoomMemory {
         sourceIds: Id<Source>[];
         dismantleMiningTarget?: Id<Structure>;
+        towerRepairTargetId?: Id<Structure>;
     }
 
     interface RoleHandler {

@@ -9,8 +9,8 @@ export class RoomManager {
             if (!room.controller || !room.controller.my) continue;
             
             // 1. SCANNING: Ensure sources are identified in memory
-            const sources = room.find(FIND_SOURCES);
-            if (!room.memory.sourceIds || room.memory.sourceIds.length !== sources.length) {
+            if (!room.memory.sourceIds || room.memory.sourceIds.length === 0) {
+                const sources = room.find(FIND_SOURCES);
                 room.memory.sourceIds = sources.map(s => s.id);
             }
  

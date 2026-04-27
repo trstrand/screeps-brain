@@ -1,11 +1,20 @@
 export const roleSalvager: RoleHandler = {
     run(creep: Creep): void {
         // 1. STATE MACHINE
+        if (creep.ticksToLive && creep.ticksToLive < 100 && creep.memory.working) {
+            creep.memory.working = false;
+            creep.say('💀 EOL');
+        }
+
         if (creep.memory.working && creep.store.getFreeCapacity() === 0) {
             creep.memory.working = false;
             creep.say('📦 Storing');
         }
         if (!creep.memory.working && creep.store.getUsedCapacity() === 0) {
+            if (creep.ticksToLive && creep.ticksToLive < 100) {
+                creep.memory.recycle = true;
+                return;
+            }
             creep.memory.working = true;
             creep.say('🔍 Salvage');
         }

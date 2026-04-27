@@ -1,4 +1,4 @@
-import { COLONY_SETTINGS } from '../config.creeps';
+import { COLONY_SETTINGS } from '../config/settings';
 
 export const roleExtractorMiner: RoleHandler = {
     run(creep: Creep): void {
@@ -13,6 +13,13 @@ export const roleExtractorMiner: RoleHandler = {
         const mineral = creep.room.find(FIND_MINERALS)[0];
         if (!mineral) {
             creep.say('❓ No Mineral');
+            return;
+        }
+
+        // 2.5 Check if mineral is empty (takes 50,000 ticks to regenerate, recycle creep)
+        if (mineral.mineralAmount === 0) {
+            creep.say('✅ Empty');
+            creep.memory.recycle = true;
             return;
         }
 
