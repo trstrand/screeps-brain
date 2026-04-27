@@ -38,10 +38,12 @@ export const roleUpgrader: RoleHandler = {
         // --- 2. STATE MAINTENANCE ---
         if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) {
             creep.memory.working = false;
+            delete creep.memory.targetId;
             creep.say('🔍 Get Energy');
         }
         if (!creep.memory.working && creep.store.getFreeCapacity() === 0) {
             creep.memory.working = true;
+            delete creep.memory.targetId;
             creep.say('⚡ Upgrade');
         }
 
@@ -84,51 +86,54 @@ export const roleUpgrader: RoleHandler = {
                 if (creep.withdraw(upgradeContainer, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
                     creep.moveTo(upgradeContainer, { range: 0 });
                 }
-            } else {
-                // FALLBACKS (Applies to both Traditional and empty-Container Static)
+                return;
+            }
 
-                // Fallback A: Loot (Path-aware)
+            // FALLBACKS (Target Fixation for Fallbacks)
+            let target: any = null;
+            if (creep.memory.targetId) {
+                target = Game.getObjectById(creep.memory.targetId as Id<any>);
+                const hasResources = target && (
+                    ('store' in target && target.store.getUsedCapacity(RESOURCE_ENERGY) > 0) || 
+                    ('amount' in target && target.amount > 0) ||
+                    (target instanceof Source && target.energy > 0)
+                );
+                if (!hasResources) {
+                    delete creep.memory.targetId;
+                    target = null;
+                }
+            }
+
+            if (!target) {
+                // Fallback A: Loot
                 const lootCandidates: (Resource | Tombstone)[] = [
                     ...creep.room.find(FIND_DROPPED_RESOURCES, { filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 50 }),
                     ...creep.room.find(FIND_TOMBSTONES, { filter: t => t.store[RESOURCE_ENERGY] > 0 })
                 ];
-                
-                const loot = creep.pos.findClosestByRange(lootCandidates);
+                target = creep.pos.findClosestByRange(lootCandidates);
 
-                if (loot) {
-                    const action = ('amount' in loot) ? creep.pickup(loot as Resource) : creep.withdraw(loot as Tombstone, RESOURCE_ENERGY);
-                    if (action === ERR_NOT_IN_RANGE) {
-                        creep.moveTo(loot, { visualizePathStyle: { stroke: '#ffaa00' } });
-                    }
-                }
                 // Fallback B: Other storage/containers
-                else {
-                    const backup = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+                if (!target) {
+                    target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
                         filter: s => (s.structureType === STRUCTURE_STORAGE || s.structureType === STRUCTURE_CONTAINER) &&
                             s.store[RESOURCE_ENERGY] > 0 && s.id !== upgradeContainer?.id
                     });
+                }
 
-                    if (backup) {
-                        if (creep.withdraw(backup, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                            creep.moveTo(backup, { visualizePathStyle: { stroke: '#ffaa00' } });
-                        }
-                    }
-                    // Fallback C: Harvest active source
-                    else {
-                        const source = creep.pos.findClosestByRange(FIND_SOURCES_ACTIVE, {
-                            filter: (s) => !COLONY_SETTINGS.ignoredSources.includes(s.id as any)
-                        });
+                // Fallback C: Harvest active source
+                if (!target) {
+                    target = creep.pos.findClosestByRange(FIND_SOURCES_ACTIVE, {
+                        filter: (s) => !COLONY_SETTINGS.ignoredSources.includes(s.id as any)
+                    });
+                }
 
-                        if (source) {
-                            if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
-                                creep.moveTo(source, {
-                                    visualizePathStyle: { stroke: '#ffaa00' },
-                                    maxOps: 4000,
-                                    reusePath: 15
-                                });
-                            }
-                        }
-                    }
+                if (target) creep.memory.targetId = target.id;
+            }
+
+            if (target) {
+                const action = ('amount' in target) ? creep.pickup(target) : (('store' in target) ? creep.withdraw(target, RESOURCE_ENERGY) : creep.harvest(target));
+                if (action === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(target, { visualizePathStyle: { stroke: '#ffaa00' }, reusePath: 10 });
                 }
             }
         }

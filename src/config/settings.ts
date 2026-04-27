@@ -92,7 +92,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             upgradeHauler: 1,
             upgrader: 2,
             builder: 0,
-            repairer: 0,
+            repairer: 1,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
