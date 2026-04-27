@@ -90,9 +90,10 @@ declare global {
     }
 
     interface RoleBodyConfig {
-        starter?: BodyPartConstant[];
-        established?: BodyPartConstant[];
-        industrial?: BodyPartConstant[];
-        standard?: BodyPartConstant[];
+        vanguard?: BodyPartConstant[];
+        sentinel?: BodyPartConstant[];
+        bastion?: BodyPartConstant[];
+        citadel?: BodyPartConstant[];
+        apex?: BodyPartConstant[];
     }
 }

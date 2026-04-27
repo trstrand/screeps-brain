@@ -1,93 +1,140 @@
+
+
 export const CREEP_CONFIGS: Record<string, RoleBodyConfig> = {
     defender: {
-        starter: [TOUGH, TOUGH, MOVE, MOVE, ATTACK, MOVE],
-        established: [TOUGH, TOUGH, TOUGH, MOVE, MOVE, MOVE, MOVE, ATTACK, ATTACK],
-        industrial: Array(10).fill(TOUGH).concat(Array(20).fill(MOVE)).concat(Array(10).fill(ATTACK))
+        vanguard: [TOUGH, TOUGH, MOVE, MOVE, ATTACK, MOVE],
+        sentinel: [TOUGH, TOUGH, TOUGH, MOVE, MOVE, MOVE, MOVE, ATTACK, ATTACK],
+        bastion: Array(5).fill(TOUGH).concat(Array(8).fill(MOVE)).concat(Array(5).fill(ATTACK)),
+        citadel: Array(8).fill(TOUGH).concat(Array(12).fill(MOVE)).concat(Array(8).fill(ATTACK)),
+        apex: Array(10).fill(TOUGH).concat(Array(15).fill(MOVE)).concat(Array(10).fill(ATTACK))
     },
     miner: {
-        starter: [WORK, CARRY, MOVE, MOVE],
-        established: [WORK, WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE],
-        industrial: [WORK, WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE]
+        vanguard: [WORK, WORK, CARRY, MOVE],
+        sentinel: [WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE],
+        bastion: Array(6).fill(WORK).concat([CARRY]).concat(Array(3).fill(MOVE)),
+        citadel: Array(7).fill(WORK).concat([CARRY]).concat(Array(4).fill(MOVE)),
+        apex: Array(8).fill(WORK).concat([CARRY]).concat(Array(5).fill(MOVE))
     },
     dismantleMiner: {
-        standard: [WORK, WORK, WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE]
+        vanguard: [WORK, WORK, CARRY, MOVE],
+        sentinel: [WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE],
+        bastion: Array(8).fill(WORK).concat([CARRY]).concat(Array(3).fill(MOVE)),
+        citadel: Array(12).fill(WORK).concat([CARRY]).concat(Array(5).fill(MOVE)),
+        apex: Array(14).fill(WORK).concat([CARRY]).concat(Array(7).fill(MOVE))
     },
     extractorMiner: {
-        starter: [WORK, WORK, CARRY, MOVE],
-        established: [WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE],
-        industrial: [WORK, WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE]
+        vanguard: [WORK, WORK, CARRY, MOVE],
+        sentinel: [WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE],
+        bastion: Array(6).fill(WORK).concat([CARRY]).concat(Array(3).fill(MOVE)),
+        citadel: Array(8).fill(WORK).concat([CARRY]).concat(Array(4).fill(MOVE)),
+        apex: Array(10).fill(WORK).concat([CARRY]).concat(Array(5).fill(MOVE))
     },
     hauler: {
-        starter: [CARRY, CARRY, MOVE, MOVE],
-        established: [CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE],
-        industrial: Array(12).fill(CARRY).concat(Array(6).fill(MOVE))
+        vanguard: [CARRY, CARRY, CARRY, CARRY, MOVE, MOVE],
+        sentinel: Array(7).fill(CARRY).concat(Array(4).fill(MOVE)),
+        bastion: Array(13).fill(CARRY).concat(Array(7).fill(MOVE)),
+        citadel: Array(20).fill(CARRY).concat(Array(10).fill(MOVE)),
+        apex: Array(24).fill(CARRY).concat(Array(12).fill(MOVE))
     },
     upgradeHauler: {
-        starter: [CARRY, CARRY, MOVE, MOVE],
-        established: [CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE],
-        industrial: Array(12).fill(CARRY).concat(Array(6).fill(MOVE))
+        vanguard: [CARRY, CARRY, CARRY, CARRY, MOVE, MOVE],
+        sentinel: Array(7).fill(CARRY).concat(Array(4).fill(MOVE)),
+        bastion: Array(13).fill(CARRY).concat(Array(7).fill(MOVE)),
+        citadel: Array(20).fill(CARRY).concat(Array(10).fill(MOVE)),
+        apex: Array(24).fill(CARRY).concat(Array(12).fill(MOVE))
     },
     upgrader: {
-        starter: [WORK, CARRY, MOVE, MOVE],
-        established: [WORK, WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE],
-        industrial: [WORK, WORK, WORK, WORK, WORK, CARRY, CARRY, MOVE, MOVE]
+        vanguard: [WORK, WORK, CARRY, MOVE],
+        sentinel: [WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE],
+        bastion: Array(7).fill(WORK).concat(Array(2).fill(CARRY)).concat(Array(4).fill(MOVE)),
+        citadel: Array(10).fill(WORK).concat(Array(4).fill(CARRY)).concat(Array(6).fill(MOVE)),
+        apex: Array(12).fill(WORK).concat(Array(4).fill(CARRY)).concat(Array(8).fill(MOVE))
     },
     builder: {
-        starter: [WORK, CARRY, MOVE, MOVE],
-        established: [WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE],
-        industrial: [WORK, WORK, WORK, WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
+        vanguard: [WORK, CARRY, CARRY, MOVE, MOVE],
+        sentinel: Array(3).fill(WORK).concat(Array(2).fill(CARRY)).concat(Array(3).fill(MOVE)),
+        bastion: Array(4).fill(WORK).concat(Array(6).fill(CARRY)).concat(Array(6).fill(MOVE)),
+        citadel: Array(6).fill(WORK).concat(Array(10).fill(CARRY)).concat(Array(8).fill(MOVE)),
+        apex: Array(8).fill(WORK).concat(Array(10).fill(CARRY)).concat(Array(10).fill(MOVE))
     },
     repairer: {
-        starter: [WORK, CARRY, MOVE, MOVE],
-        established: [WORK, WORK, CARRY, CARRY, MOVE, MOVE],
-        industrial: [WORK, WORK, WORK, WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
+        vanguard: [WORK, CARRY, CARRY, MOVE, MOVE],
+        sentinel: Array(3).fill(WORK).concat(Array(2).fill(CARRY)).concat(Array(3).fill(MOVE)),
+        bastion: Array(4).fill(WORK).concat(Array(6).fill(CARRY)).concat(Array(6).fill(MOVE)),
+        citadel: Array(6).fill(WORK).concat(Array(10).fill(CARRY)).concat(Array(8).fill(MOVE)),
+        apex: Array(8).fill(WORK).concat(Array(10).fill(CARRY)).concat(Array(10).fill(MOVE))
     },
     salvager: {
-        starter: [CARRY, CARRY, MOVE, MOVE],
-        established: [CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE],
-        //industrial: Array(12).fill(CARRY).concat(Array(6).fill(MOVE))
-        industrial: Array(24).fill(CARRY).concat(Array(12).fill(MOVE))
+        vanguard: [CARRY, CARRY, CARRY, CARRY, MOVE, MOVE],
+        sentinel: Array(7).fill(CARRY).concat(Array(4).fill(MOVE)),
+        bastion: Array(13).fill(CARRY).concat(Array(7).fill(MOVE)),
+        citadel: Array(20).fill(CARRY).concat(Array(10).fill(MOVE)),
+        apex: Array(24).fill(CARRY).concat(Array(12).fill(MOVE))
     },
     transferHauler: {
-        starter: [CARRY, CARRY, MOVE, MOVE],
-        established: [CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE],
-        industrial: Array(25).fill(CARRY).concat(Array(25).fill(MOVE))
+        vanguard: [CARRY, CARRY, CARRY, CARRY, MOVE, MOVE],
+        sentinel: Array(7).fill(CARRY).concat(Array(4).fill(MOVE)),
+        bastion: Array(13).fill(CARRY).concat(Array(7).fill(MOVE)),
+        citadel: Array(20).fill(CARRY).concat(Array(10).fill(MOVE)),
+        apex: Array(24).fill(CARRY).concat(Array(12).fill(MOVE))
     },
     remoteMiner: {
-        starter: [WORK, WORK, CARRY, MOVE],
-        established: [WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE],
-        industrial: [WORK, WORK, WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE]
+        vanguard: [WORK, WORK, CARRY, MOVE],
+        sentinel: [WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE],
+        bastion: Array(6).fill(WORK).concat([CARRY]).concat(Array(4).fill(MOVE)),
+        citadel: Array(8).fill(WORK).concat([CARRY]).concat(Array(6).fill(MOVE)),
+        apex: Array(10).fill(WORK).concat([CARRY]).concat(Array(8).fill(MOVE))
     },
     remoteHauler: {
-        starter: [CARRY, CARRY, MOVE, MOVE],
-        established: [CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE],
-        industrial: Array(15).fill(CARRY).concat(Array(15).fill(MOVE))
+        vanguard: [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE],
+        sentinel: Array(5).fill(CARRY).concat(Array(5).fill(MOVE)),
+        bastion: Array(10).fill(CARRY).concat(Array(10).fill(MOVE)),
+        citadel: Array(15).fill(CARRY).concat(Array(15).fill(MOVE)),
+        apex: Array(18).fill(CARRY).concat(Array(18).fill(MOVE))
     },
     remoteExtractorMiner: {
-        starter: [WORK, WORK, CARRY, MOVE],
-        established: [WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE, MOVE],
-        industrial: Array(10).fill(WORK).concat([CARRY]).concat(Array(5).fill(MOVE))
+        vanguard: [WORK, WORK, CARRY, MOVE],
+        sentinel: [WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE],
+        bastion: Array(6).fill(WORK).concat([CARRY]).concat(Array(4).fill(MOVE)),
+        citadel: Array(8).fill(WORK).concat([CARRY]).concat(Array(6).fill(MOVE)),
+        apex: Array(10).fill(WORK).concat([CARRY]).concat(Array(8).fill(MOVE))
     },
     pioneer: {
-        standard: Array(4).fill(WORK).concat(Array(4).fill(CARRY)).concat(Array(8).fill(MOVE))
+        vanguard: [WORK, CARRY, MOVE, MOVE],
+        sentinel: Array(2).fill(WORK).concat(Array(2).fill(CARRY)).concat(Array(4).fill(MOVE)),
+        bastion: Array(4).fill(WORK).concat(Array(4).fill(CARRY)).concat(Array(8).fill(MOVE)),
+        citadel: Array(6).fill(WORK).concat(Array(6).fill(CARRY)).concat(Array(12).fill(MOVE)),
+        apex: Array(7).fill(WORK).concat(Array(7).fill(CARRY)).concat(Array(14).fill(MOVE))
     },
     expedition: {
-        standard: [CLAIM, CLAIM, MOVE, MOVE]
+        vanguard: [CLAIM, MOVE],
+        sentinel: [CLAIM, MOVE],
+        bastion: [CLAIM, MOVE],
+        citadel: [CLAIM, CLAIM, MOVE, MOVE],
+        apex: [CLAIM, CLAIM, MOVE, MOVE]
     },
     vanguard: {
-        standard: [TOUGH, TOUGH, MOVE, MOVE, MOVE, MOVE, ATTACK, HEAL]
+        vanguard: [TOUGH, TOUGH, MOVE, MOVE, MOVE, ATTACK, ATTACK],
+        sentinel: [TOUGH, TOUGH, MOVE, MOVE, MOVE, MOVE, ATTACK, HEAL],
+        bastion: Array(4).fill(TOUGH).concat(Array(6).fill(MOVE)).concat(Array(4).fill(ATTACK)).concat([HEAL]),
+        citadel: Array(6).fill(TOUGH).concat(Array(12).fill(MOVE)).concat(Array(5).fill(ATTACK)).concat([HEAL]),
+        apex: Array(10).fill(TOUGH).concat(Array(15).fill(MOVE)).concat(Array(8).fill(ATTACK)).concat([HEAL])
     },
     breaker: {
-        standard: [ATTACK, ATTACK, MOVE, MOVE],
-        //established: Array(5).fill(TOUGH).concat(Array(15).fill(MOVE)).concat(Array(10).fill(ATTACK)).concat(Array(5).fill(HEAL))
-        established: Array(8).fill(ATTACK).concat(Array(8).fill(MOVE))
+        vanguard: [ATTACK, ATTACK, MOVE, MOVE],
+        sentinel: Array(4).fill(ATTACK).concat(Array(4).fill(MOVE)),
+        bastion: Array(7).fill(ATTACK).concat(Array(7).fill(MOVE)),
+        citadel: Array(10).fill(ATTACK).concat(Array(10).fill(MOVE)),
+        apex: Array(13).fill(ATTACK).concat(Array(13).fill(MOVE))
     },
     remoteBuilder: {
-        starter: [WORK, CARRY, MOVE, MOVE],
-        established: [WORK, WORK, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE],
-        industrial: [WORK, WORK, WORK, WORK, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE, MOVE]
+        vanguard: [WORK, CARRY, CARRY, MOVE, MOVE],
+        sentinel: Array(3).fill(WORK).concat(Array(2).fill(CARRY)).concat(Array(3).fill(MOVE)),
+        bastion: Array(4).fill(WORK).concat(Array(6).fill(CARRY)).concat(Array(6).fill(MOVE)),
+        citadel: Array(6).fill(WORK).concat(Array(10).fill(CARRY)).concat(Array(8).fill(MOVE)),
+        apex: Array(8).fill(WORK).concat(Array(10).fill(CARRY)).concat(Array(10).fill(MOVE))
     },
     claimer: {
-        standard: [CLAIM, MOVE]
+        vanguard: [CLAIM, MOVE]
     }
 };

@@ -28,10 +28,11 @@ export class SpawnManager {
     static getBody(roleName: string, cap: number): BodyPartConstant[] {
         const config = CREEP_CONFIGS[roleName];
         if (!config) return [];
-        if (config.standard) return config.standard;
-        if (cap >= 1000 && config.industrial) return config.industrial;
-        if (cap >= 550 && config.established) return config.established;
-        return config.starter || [];
+        if (cap >= 1800 && config.apex) return config.apex;
+        if (cap >= 1500 && config.citadel) return config.citadel;
+        if (cap >= 1000 && config.bastion) return config.bastion;
+        if (cap >= 550 && config.sentinel) return config.sentinel;
+        return config.vanguard || [];
     }
 
     static run(room: Room) {
