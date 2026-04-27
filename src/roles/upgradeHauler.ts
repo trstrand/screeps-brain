@@ -61,7 +61,6 @@ export const roleUpgradeHauler: RoleHandler = {
                         creep.say('⌛ Waiting');
                     } else {
                         creep.moveTo(closest, { range: 1, visualizePathStyle: { stroke: '#ffffff' } });
-                        creep.say('🛰️ Parking');
                     }
                 }
             } else {
