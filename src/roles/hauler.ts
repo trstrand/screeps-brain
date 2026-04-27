@@ -104,8 +104,8 @@ export const roleHauler: RoleHandler = {
             if (creep.memory.targetId) {
                 target = Game.getObjectById(creep.memory.targetId as Id<any>);
                 // Validate: still exists and has energy
-                const hasStore = target && 'store' in target && target.store.getUsedCapacity(RESOURCE_ENERGY) > 0;
-                const hasAmount = target && 'amount' in target && target.amount > 0;
+                const hasStore = target && 'store' in target && target.store.getUsedCapacity(RESOURCE_ENERGY) > 50;
+                const hasAmount = target && 'amount' in target && target.amount > 50;
                 if (!hasStore && !hasAmount) {
                     delete creep.memory.targetId;
                     target = null;

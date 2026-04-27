@@ -69,11 +69,23 @@ export const roleUpgradeHauler: RoleHandler = {
             // Target Fixation
             if (creep.memory.targetId) {
                 target = Game.getObjectById(creep.memory.targetId as Id<any>);
-                const hasResources = target && (
-                    ('store' in target && target.store.getUsedCapacity() > 0) || 
-                    ('amount' in target && target.amount > 0)
-                );
-                if (!hasResources) {
+                let isValidTarget = false;
+
+                if (target) {
+                    if ('store' in target) {
+                        const targetEnergy = target.store[RESOURCE_ENERGY] || 0;
+                        const hasAnyMinerals = Object.keys(target.store).some(r => r !== RESOURCE_ENERGY && target.store[r as ResourceConstant] > 0);
+                        isValidTarget = targetEnergy > 50 || hasAnyMinerals;
+                    } else if ('amount' in target) {
+                        if (target.resourceType === RESOURCE_ENERGY) {
+                            isValidTarget = target.amount > 50;
+                        } else {
+                            isValidTarget = target.amount > 0;
+                        }
+                    }
+                }
+
+                if (!isValidTarget) {
                     delete creep.memory.targetId;
                     target = null;
                 }
