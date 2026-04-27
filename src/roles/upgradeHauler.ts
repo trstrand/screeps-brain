@@ -33,26 +33,29 @@ export const roleUpgradeHauler: RoleHandler = {
             const controller = creep.room.controller;
             if (!controller) return;
 
-            // Find containers near the controller (range 1) that are NOT source containers
+            // Find ALL containers directly adjacent to the controller (range 1)
             const containers = controller.pos.findInRange(FIND_STRUCTURES, 1, {
-                filter: (s) => s.structureType === STRUCTURE_CONTAINER && 
-                               s.pos.findInRange(FIND_SOURCES, 2).length === 0
+                filter: (s) => s.structureType === STRUCTURE_CONTAINER
             }) as StructureContainer[];
 
-            const availableTargets = containers.filter(c => c.store.getFreeCapacity(RESOURCE_ENERGY) > 0);
+            const targetsWithSpace = containers.filter(c => c.store.getFreeCapacity(RESOURCE_ENERGY) > 0);
 
-            if (availableTargets.length > 0) {
-                // If we are already next to one that has space, stay there. Otherwise find the emptiest/closest.
-                const currentAdjacent = availableTargets.find(t => creep.pos.isNearTo(t));
-                const target = currentAdjacent || availableTargets.sort((a, b) => a.store[RESOURCE_ENERGY] - b.store[RESOURCE_ENERGY])[0];
+            if (targetsWithSpace.length > 0) {
+                // Priority 1: Fill the container we are already standing next to
+                const adjacentTarget = targetsWithSpace.find(t => creep.pos.isNearTo(t));
+                
+                // Priority 2: Go to the one with the most space (or closest)
+                const target = adjacentTarget || targetsWithSpace.sort((a, b) => a.store[RESOURCE_ENERGY] - b.store[RESOURCE_ENERGY])[0];
 
                 if (creep.pos.isNearTo(target)) {
                     creep.transfer(target, RESOURCE_ENERGY);
+                    creep.say('📥 Filling');
                 } else {
-                    creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 10 });
+                    creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 5 });
+                    creep.say('🛰️ Moving');
                 }
             } else if (containers.length > 0) {
-                // All containers are full, just park near the closest one
+                // ALL containers are full, park next to the closest one
                 const closest = creep.pos.findClosestByRange(containers);
                 if (closest) {
                     if (creep.pos.isNearTo(closest)) {

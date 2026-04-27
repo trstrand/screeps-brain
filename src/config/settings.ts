@@ -17,15 +17,21 @@ export const COLONY_SETTINGS: ColonySettings = {
     attackWalls: false,
     attackRamparts: false,
     //wall and rampart repair settings
-    wallMaxHits: 1002,
-    rampartMaxHits: 1000,
+    wallMaxHits: 1e3,
+    rampartMaxHits: 1e3,
     roomWallMaxHits: {
         "E59S58": 25e4,
-        "E58S57": 5e4,
-        "E57S57": 1e4
+        'E58S58': 1e5,
+        "E58S57": 25e4,
+        "E57S57": 25e4,
+        "E55S58": 25e4
     },
     roomRampartMaxHits: {
-        'E59S58': 1e5
+        "E59S58": 1e5,
+        'E58S58': 1e4,
+        "E58S57": 1e5,
+        "E57S57": 1e4,
+        "E55S58": 1e5
     },
     remoteMining: {
         'E59S58': [], // Example: 'HomeRoom': ['RemoteRoom1', 'RemoteRoom2']
@@ -48,7 +54,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             upgradeHauler: 1,
             upgrader: 2,
             builder: 0,
-            repairer: 1,
+            repairer: 0,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
@@ -66,8 +72,8 @@ export const COLONY_SETTINGS: ColonySettings = {
             miner: 2,
             dismantleMiner: 1,
             extractorMiner: 0,
-            hauler: 2,
-            upgradeHauler: 2,
+            hauler: 3,
+            upgradeHauler: 3,
             upgrader: 2,
             builder: 0,
             repairer: 1,

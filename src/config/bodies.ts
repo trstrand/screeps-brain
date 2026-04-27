@@ -45,7 +45,8 @@ export const CREEP_CONFIGS: Record<string, RoleBodyConfig> = {
     salvager: {
         starter: [CARRY, CARRY, MOVE, MOVE],
         established: [CARRY, CARRY, CARRY, CARRY, CARRY, MOVE, MOVE, MOVE, MOVE, MOVE],
-        industrial: Array(12).fill(CARRY).concat(Array(6).fill(MOVE))
+        //industrial: Array(12).fill(CARRY).concat(Array(6).fill(MOVE))
+        industrial: Array(24).fill(CARRY).concat(Array(12).fill(MOVE))
     },
     transferHauler: {
         starter: [CARRY, CARRY, MOVE, MOVE],
@@ -78,7 +79,8 @@ export const CREEP_CONFIGS: Record<string, RoleBodyConfig> = {
     },
     breaker: {
         standard: [TOUGH, TOUGH, MOVE, MOVE, MOVE, MOVE, ATTACK, ATTACK, HEAL],
-        established: Array(5).fill(TOUGH).concat(Array(15).fill(MOVE)).concat(Array(10).fill(ATTACK)).concat(Array(5).fill(HEAL))
+        //established: Array(5).fill(TOUGH).concat(Array(15).fill(MOVE)).concat(Array(10).fill(ATTACK)).concat(Array(5).fill(HEAL))
+        established: Array(24).fill(ATTACK).concat(Array(12).fill(MOVE))
     },
     remoteBuilder: {
         starter: [WORK, CARRY, MOVE, MOVE],
