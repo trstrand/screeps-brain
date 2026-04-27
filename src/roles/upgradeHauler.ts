@@ -33,24 +33,34 @@ export const roleUpgradeHauler: RoleHandler = {
             const controller = creep.room.controller;
             if (!controller) return;
 
-            // Targets are containers DIRECTLY next to controller (range 1)
-            const targets = controller.pos.findInRange(FIND_STRUCTURES, 1, {
-                filter: (s) => s.structureType === STRUCTURE_CONTAINER
+            // Find containers near the controller (range 1) that are NOT source containers
+            const containers = controller.pos.findInRange(FIND_STRUCTURES, 1, {
+                filter: (s) => s.structureType === STRUCTURE_CONTAINER && 
+                               s.pos.findInRange(FIND_SOURCES, 2).length === 0
             }) as StructureContainer[];
 
-            if (targets.length > 0) {
-                // Pick the emptiest one
-                targets.sort((a, b) => a.store[RESOURCE_ENERGY] - b.store[RESOURCE_ENERGY]);
-                const target = targets[0];
+            const availableTargets = containers.filter(c => c.store.getFreeCapacity(RESOURCE_ENERGY) > 0);
+
+            if (availableTargets.length > 0) {
+                // If we are already next to one that has space, stay there. Otherwise find the emptiest/closest.
+                const currentAdjacent = availableTargets.find(t => creep.pos.isNearTo(t));
+                const target = currentAdjacent || availableTargets.sort((a, b) => a.store[RESOURCE_ENERGY] - b.store[RESOURCE_ENERGY])[0];
 
                 if (creep.pos.isNearTo(target)) {
-                    if (target.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                        creep.transfer(target, RESOURCE_ENERGY);
-                    } else {
-                        creep.say('⌛ Waiting');
-                    }
+                    creep.transfer(target, RESOURCE_ENERGY);
                 } else {
                     creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 10 });
+                }
+            } else if (containers.length > 0) {
+                // All containers are full, just park near the closest one
+                const closest = creep.pos.findClosestByRange(containers);
+                if (closest) {
+                    if (creep.pos.isNearTo(closest)) {
+                        creep.say('⌛ Waiting');
+                    } else {
+                        creep.moveTo(closest, { range: 1, visualizePathStyle: { stroke: '#ffffff' } });
+                        creep.say('🛰️ Parking');
+                    }
                 }
             } else {
                 creep.say('⌛ No Cont');
