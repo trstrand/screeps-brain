@@ -65,7 +65,7 @@ declare global {
         targetId?: Id<any>;
         deliveryTargetId?: Id<any>;
         sourceIndex?: number; 
-        targetContainerId?: Id<StructureContainer>;
+        targetContainerId?: Id<StructureContainer | StructureLink>;
         repairTargetId?: Id<Structure>;
         dismantleWork?: boolean;
         dismantleTarget?: Id<any>;
@@ -80,6 +80,11 @@ declare global {
         sourceIds: Id<Source>[];
         dismantleMiningTarget?: Id<Structure>;
         towerRepairTargetId?: Id<Structure>;
+        sourceLink1?: Id<StructureLink>;
+        sourceLink2?: Id<StructureLink>;
+        controllerLink?: Id<StructureLink>;
+        storageLink?: Id<StructureLink>;
+        linkCheckDone?: boolean;
     }
 
     interface RoleHandler {

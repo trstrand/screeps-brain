@@ -3,7 +3,7 @@ import { COLONY_SETTINGS } from '../config/settings';
 export const roleUpgrader: RoleHandler = {
     run(creep: Creep): void {
         // --- 1. DYNAMIC CONTAINER NEGOTIATION ---
-        let upgradeContainer = Game.getObjectById(creep.memory.targetContainerId as Id<StructureContainer>);
+        let upgradeContainer = Game.getObjectById(creep.memory.targetContainerId as Id<StructureContainer | StructureLink>);
 
         if (!upgradeContainer) {
             delete creep.memory.targetContainerId;
@@ -11,13 +11,18 @@ export const roleUpgrader: RoleHandler = {
                 // Find containers close to the controller (range <= 3 for upgrading)
                 // and explicitly exclude containers that are adjacent to sources (source containers)
                 let containers = creep.room.find(FIND_STRUCTURES, {
-                    filter: s => s.structureType === STRUCTURE_CONTAINER &&
+                    filter: s => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_LINK) &&
                         s.pos.getRangeTo(creep.room.controller!) <= 3 &&
                         s.pos.findInRange(FIND_SOURCES, 1).length === 0
-                }) as StructureContainer[];
+                }) as (StructureContainer | StructureLink)[];
 
-                // Sort by distance to controller to prefer the ones 'directly next' to it
-                containers.sort((a, b) => a.pos.getRangeTo(creep.room.controller!) - b.pos.getRangeTo(creep.room.controller!));
+                // Sort to prefer links (especially with energy), then by distance
+                containers.sort((a, b) => {
+                    const aScore = a.structureType === STRUCTURE_LINK ? (a.store[RESOURCE_ENERGY] > 0 ? 2 : 1) : 0;
+                    const bScore = b.structureType === STRUCTURE_LINK ? (b.store[RESOURCE_ENERGY] > 0 ? 2 : 1) : 0;
+                    if (aScore !== bScore) return bScore - aScore;
+                    return a.pos.getRangeTo(creep.room.controller!) - b.pos.getRangeTo(creep.room.controller!);
+                });
 
                 const otherUpgraders = Object.values(Game.creeps).filter(c =>
                     c.memory.role === creep.memory.role &&

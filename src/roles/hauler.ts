@@ -67,6 +67,23 @@ export const roleHauler: RoleHandler = {
             }
 
             if (!target) {
+                // --- LINK SHUTTLE LOGIC (Delivery) ---
+                const storageLink = Game.getObjectById(creep.room.memory.storageLink as Id<StructureLink>);
+                const controllerLink = Game.getObjectById(creep.room.memory.controllerLink as Id<StructureLink>);
+                const sourceLink1 = Game.getObjectById(creep.room.memory.sourceLink1 as Id<StructureLink>);
+                const sourceLink2 = Game.getObjectById(creep.room.memory.sourceLink2 as Id<StructureLink>);
+                const hasSourceLink = !!sourceLink1 || !!sourceLink2;
+
+                // If no source links, but we have storage/controller links, and base is full: Shuttle TO storageLink
+                if (!hasSourceLink && storageLink && controllerLink && !this.roomNeedsEnergy(creep.room)) {
+                    if (storageLink.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                        target = storageLink;
+                        creep.memory.deliveryTargetId = target.id;
+                    }
+                }
+            }
+
+            if (!target) {
                 // IF CARRYING ENERGY: Normal priority
                 target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
                     filter: (s) => (s.structureType === STRUCTURE_EXTENSION || s.structureType === STRUCTURE_SPAWN) &&
@@ -185,10 +202,23 @@ export const roleHauler: RoleHandler = {
                         target = creep.pos.findClosestByRange(candidates);
                     }
 
+                    // --- LINK SHUTTLE LOGIC (Collection) ---
+                    const storageLink = Game.getObjectById(creep.room.memory.storageLink as Id<StructureLink>);
+                    const controllerLink = Game.getObjectById(creep.room.memory.controllerLink as Id<StructureLink>);
+                    const sourceLink1 = Game.getObjectById(creep.room.memory.sourceLink1 as Id<StructureLink>);
+                    const sourceLink2 = Game.getObjectById(creep.room.memory.sourceLink2 as Id<StructureLink>);
+                    const hasSourceLink = !!sourceLink1 || !!sourceLink2;
+
+                    // Priority 2.5: Shuttle FROM storageLink TO storage if base is full and source links exist
+                    if (!target && baseFull && hasSourceLink && storageLink && storageLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        target = storageLink;
+                    }
+
                     // Priority 3: Storage Fallback
                     if (!target && creep.room.storage && creep.room.storage.store[RESOURCE_ENERGY] > 0) {
-                        const needsEnergy = this.roomNeedsEnergy(creep.room);
-                        if (needsEnergy) target = creep.room.storage;
+                        const needsEnergy = !baseFull;
+                        const needsLinkShuttle = baseFull && !hasSourceLink && controllerLink && storageLink && storageLink.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
+                        if (needsEnergy || needsLinkShuttle) target = creep.room.storage;
                     }
 
                     // Priority 4: Controller Container Emergency Fallback
