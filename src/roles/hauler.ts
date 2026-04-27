@@ -203,7 +203,7 @@ export const roleHauler: RoleHandler = {
                     
                     // A. Always check for dropped energy at our feet/nearby first
                     const droppedNearby = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, {
-                        filter: r => r.resourceType === RESOURCE_ENERGY
+                        filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 0
                     })[0];
 
                     if (droppedNearby) {
@@ -212,6 +212,22 @@ export const roleHauler: RoleHandler = {
                         creep.withdraw(target, RESOURCE_ENERGY);
                     } else if ('amount' in target) {
                         creep.pickup(target);
+                    }
+
+                    // --- POST-INTERACTION: Move on if area is empty ---
+                    // If we have some energy, and there is no more energy (>50) nearby, go deliver
+                    if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        const moreNearby = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 5, {
+                            filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 50
+                        }).length > 0 || (
+                            'store' in target && target.store[RESOURCE_ENERGY] > 50
+                        );
+
+                        if (!moreNearby) {
+                            delete creep.memory.targetId;
+                            creep.memory.working = true;
+                            creep.say('📦 Enough');
+                        }
                     }
                 }
             } else {
