@@ -52,34 +52,47 @@ export class TowerManager {
                     target = null;
                     delete room.memory.towerRepairTargetId;
 
-                    // TICK THROTTLING: Only perform the expensive structure search every 50 ticks
-                    if (Game.time % 50 === 0) {
+                    // Perform structure search (Throttle search execution but allow it when we have NO target)
+                    if (Game.time % 10 === 0 || !target) {
                         if (!structuresLoaded) {
                             const allStructures = room.find(FIND_STRUCTURES);
-                            criticalRoads = allStructures.filter(s => s.structureType === STRUCTURE_ROAD && s.hits < s.hitsMax * 0.5);
-                            containers = allStructures.filter(s => s.structureType === STRUCTURE_CONTAINER && s.hits < s.hitsMax * 0.75);
-                            normalRoads = allStructures.filter(s => s.structureType === STRUCTURE_ROAD && s.hits < s.hitsMax * 0.95);
-                            coreStructures = allStructures.filter(s => 
-                                s.structureType !== STRUCTURE_ROAD && 
-                                s.structureType !== STRUCTURE_CONTAINER && 
-                                s.structureType !== STRUCTURE_WALL && 
-                                s.structureType !== STRUCTURE_RAMPART && 
-                                s.hits < s.hitsMax
+                            
+                            // 1. Emergency Defense (Walls/Ramparts < 1000 hits)
+                            const emergencyWalls = allStructures.filter(s => 
+                                (s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART) && 
+                                s.hits < 1000
                             );
-                            wallsAndRamparts = allStructures.filter(s => 
-                                (s.structureType === STRUCTURE_WALL && s.hits < wallMaxHits) ||
-                                (s.structureType === STRUCTURE_RAMPART && s.hits < rampartMaxHits)
-                            );
-                            structuresLoaded = true;
-                        }
 
-                        if (coreStructures.length > 0) target = tower.pos.findClosestByRange(coreStructures);
-                        else if (criticalRoads.length > 0) target = tower.pos.findClosestByRange(criticalRoads);
-                        else if (containers.length > 0) target = tower.pos.findClosestByRange(containers);
-                        else if (normalRoads.length > 0) target = tower.pos.findClosestByRange(normalRoads);
-                        else if (wallsAndRamparts.length > 0) {
-                            wallsAndRamparts.sort((a, b) => a.hits - b.hits);
-                            target = wallsAndRamparts[0];
+                            if (emergencyWalls.length > 0) {
+                                emergencyWalls.sort((a, b) => a.hits - b.hits);
+                                target = emergencyWalls[0];
+                            } else {
+                                // 2. Normal Maintenance
+                                coreStructures = allStructures.filter(s => 
+                                    s.structureType !== STRUCTURE_ROAD && 
+                                    s.structureType !== STRUCTURE_CONTAINER && 
+                                    s.structureType !== STRUCTURE_WALL && 
+                                    s.structureType !== STRUCTURE_RAMPART && 
+                                    s.hits < s.hitsMax
+                                );
+                                criticalRoads = allStructures.filter(s => s.structureType === STRUCTURE_ROAD && s.hits < s.hitsMax * 0.5);
+                                containers = allStructures.filter(s => s.structureType === STRUCTURE_CONTAINER && s.hits < s.hitsMax * 0.75);
+                                normalRoads = allStructures.filter(s => s.structureType === STRUCTURE_ROAD && s.hits < s.hitsMax * 0.95);
+                                wallsAndRamparts = allStructures.filter(s => 
+                                    (s.structureType === STRUCTURE_WALL && s.hits < wallMaxHits) ||
+                                    (s.structureType === STRUCTURE_RAMPART && s.hits < rampartMaxHits)
+                                );
+
+                                if (coreStructures.length > 0) target = tower.pos.findClosestByRange(coreStructures);
+                                else if (criticalRoads.length > 0) target = tower.pos.findClosestByRange(criticalRoads);
+                                else if (containers.length > 0) target = tower.pos.findClosestByRange(containers);
+                                else if (normalRoads.length > 0) target = tower.pos.findClosestByRange(normalRoads);
+                                else if (wallsAndRamparts.length > 0) {
+                                    wallsAndRamparts.sort((a, b) => a.hits - b.hits);
+                                    target = wallsAndRamparts[0];
+                                }
+                            }
+                            structuresLoaded = true;
                         }
 
                         if (target) {
