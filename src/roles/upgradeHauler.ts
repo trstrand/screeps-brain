@@ -14,7 +14,7 @@ export const roleUpgradeHauler: RoleHandler = {
 
         // 2. DELIVERY PHASE
         if (creep.memory.working) {
-            const mineralType = Object.keys(creep.store).find(r => r !== RESOURCE_ENERGY) as ResourceConstant;
+            const mineralType = Object.keys(creep.store).find((r: string) => r !== RESOURCE_ENERGY) as ResourceConstant;
 
             // IF CARRYING MINERALS: Deliver to Storage
             if (mineralType) {
@@ -64,7 +64,7 @@ export const roleUpgradeHauler: RoleHandler = {
         else {
             let target: any = null;
             const hasEnergy = creep.store[RESOURCE_ENERGY] > 0;
-            const hasMinerals = Object.keys(creep.store).some(r => r !== RESOURCE_ENERGY && creep.store[r as ResourceConstant] > 0);
+            const hasMinerals = Object.keys(creep.store).some((r: string) => r !== RESOURCE_ENERGY && creep.store[r as ResourceConstant] > 0);
 
             // Target Fixation
             if (creep.memory.targetId) {
@@ -74,7 +74,7 @@ export const roleUpgradeHauler: RoleHandler = {
                 if (target) {
                     if ('store' in target) {
                         const targetEnergy = target.store[RESOURCE_ENERGY] || 0;
-                        const hasAnyMinerals = Object.keys(target.store).some(r => r !== RESOURCE_ENERGY && target.store[r as ResourceConstant] > 0);
+                        const hasAnyMinerals = Object.keys(target.store).some((r: string) => r !== RESOURCE_ENERGY && target.store[r as ResourceConstant] > 0);
                         isValidTarget = targetEnergy > 50 || hasAnyMinerals;
                     } else if ('amount' in target) {
                         if (target.resourceType === RESOURCE_ENERGY) {
@@ -96,7 +96,7 @@ export const roleUpgradeHauler: RoleHandler = {
                 if (!hasEnergy) {
                     const mineralCandidates: (Resource | StructureContainer | Tombstone | Ruin)[] = [
                         ...creep.room.find(FIND_DROPPED_RESOURCES, {
-                            filter: r => r.resourceType !== RESOURCE_ENERGY && 
+                            filter: (r: Resource) => r.resourceType !== RESOURCE_ENERGY && 
                                          r.pos.findInRange(FIND_MINERALS, 3).length > 0
                         }),
                         ...creep.room.find(FIND_STRUCTURES, {
@@ -105,10 +105,10 @@ export const roleUpgradeHauler: RoleHandler = {
                                          s.pos.findInRange(FIND_MINERALS, 3).length > 0
                         }) as StructureContainer[],
                         ...creep.room.find(FIND_TOMBSTONES, {
-                            filter: t => Object.keys(t.store).some(r => r !== RESOURCE_ENERGY && t.store[r as ResourceConstant] > 0)
+                            filter: (t: Tombstone) => Object.keys(t.store).some((r: string) => r !== RESOURCE_ENERGY && t.store[r as ResourceConstant] > 0)
                         }),
                         ...creep.room.find(FIND_RUINS, {
-                            filter: r => Object.keys(r.store).some(res => res !== RESOURCE_ENERGY && r.store[res as ResourceConstant] > 0)
+                            filter: (r: Ruin) => Object.keys(r.store).some((res: string) => res !== RESOURCE_ENERGY && r.store[res as ResourceConstant] > 0)
                         })
                     ];
 
@@ -119,13 +119,13 @@ export const roleUpgradeHauler: RoleHandler = {
                 if (!target && !hasMinerals) {
                     const energySources = [
                         ...creep.room.find(FIND_DROPPED_RESOURCES, {
-                            filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 50
+                            filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 50
                         }),
                         ...creep.room.find(FIND_TOMBSTONES, {
-                            filter: t => t.store[RESOURCE_ENERGY] > 50
+                            filter: (t: Tombstone) => t.store[RESOURCE_ENERGY] > 50
                         }),
                         ...creep.room.find(FIND_RUINS, {
-                            filter: r => r.store[RESOURCE_ENERGY] > 50
+                            filter: (r: Ruin) => r.store[RESOURCE_ENERGY] > 50
                         }),
                         ...creep.room.find(FIND_STRUCTURES, {
                             filter: (s) => {
@@ -156,14 +156,48 @@ export const roleUpgradeHauler: RoleHandler = {
 
             if (target) {
                 if (creep.pos.isNearTo(target)) {
-                    if ('amount' in target) {
-                        creep.pickup(target);
-                    } else {
-                        // Withdraw minerals if any, otherwise energy
-                        const resourceToWithdraw = Object.keys(target.store).find(r => target.store[r as ResourceConstant] > 0) as ResourceConstant || RESOURCE_ENERGY;
+                    // 1. Priority: Pick up dropped energy at our feet or adjacent (overflow)
+                    const droppedNearby = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, {
+                        filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0
+                    })[0];
+
+                    if (droppedNearby) {
+                        creep.pickup(droppedNearby);
+                    } else if ('store' in target) {
+                        // 2. Withdraw from target structure (minerals if any, else energy)
+                        const resourceToWithdraw = Object.keys(target.store).find((r: string) => target.store[r as ResourceConstant] > 0) as ResourceConstant || RESOURCE_ENERGY;
                         creep.withdraw(target, resourceToWithdraw);
+                    } else if ('amount' in target) {
+                        // 3. Target was already a dropped resource
+                        creep.pickup(target);
+                    }
+
+                    // 4. Post-Interaction: If we have energy and nothing else is nearby, go deliver
+                    if (creep.store[RESOURCE_ENERGY] > 0) {
+                        const hasMoreEnergyNearby = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 5, {
+                            filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0
+                        }).length > 0 || (
+                            'store' in target && target.store[RESOURCE_ENERGY] > 50
+                        );
+
+                        if (!hasMoreEnergyNearby) {
+                            creep.memory.working = true;
+                            delete creep.memory.targetId;
+                            creep.say('📦 Deliver');
+                        }
                     }
                 } else {
+                    // If moving to storage, check for dropped energy within range 5 of storage first
+                    if ('structureType' in target && target.structureType === STRUCTURE_STORAGE) {
+                        const droppedNearStorage = target.pos.findInRange(FIND_DROPPED_RESOURCES, 5, {
+                            filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 20
+                        })[0];
+                        
+                        if (droppedNearStorage) {
+                            creep.moveTo(droppedNearStorage, { visualizePathStyle: { stroke: '#ffaa00' } });
+                            return;
+                        }
+                    }
                     creep.moveTo(target, { visualizePathStyle: { stroke: '#ffaa00' }, reusePath: 10 });
                 }
             } else {
