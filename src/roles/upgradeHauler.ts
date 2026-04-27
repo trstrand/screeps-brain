@@ -156,7 +156,8 @@ export const roleUpgradeHauler: RoleHandler = {
                                 // Containers are valid if they have energy and AREN'T the controller containers
                                 // Controller containers are defined as range 1 (directly next to controller)
                                 if (s.structureType === STRUCTURE_CONTAINER) {
-                                    const isControllerContainer = creep.room.controller && s.pos.inRangeTo(creep.room.controller, 1);
+                                    // Controller containers are now range 2
+                                    const isControllerContainer = creep.room.controller && s.pos.inRangeTo(creep.room.controller, 2);
                                     const isSourceContainer = s.pos.findInRange(FIND_SOURCES, 2).length > 0;
                                     
                                     return s.store[RESOURCE_ENERGY] > 100 && (isSourceContainer || !isControllerContainer);
