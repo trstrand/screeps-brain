@@ -3,105 +3,127 @@ import { COLONY_SETTINGS } from '../config/settings';
 export class TowerManager {
     static run(room: Room) {
         const towers = room.find<StructureTower>(FIND_MY_STRUCTURES, {
-            filter: s => s.structureType === STRUCTURE_TOWER
+            filter: s => s.structureType === STRUCTURE_TOWER && s.store.getUsedCapacity(RESOURCE_ENERGY) >= 10
         });
 
         if (towers.length === 0) return;
 
-        // 1 & 2: Dynamic Threats & Injuries
+        // 1. ATTACK PHASE (Priority: Hostiles with Heal Parts)
         const hostiles = room.find(FIND_HOSTILE_CREEPS);
-        const injuredCreeps = room.find(FIND_MY_CREEPS, { filter: c => c.hits < c.hitsMax });
-        
-        // Lazy-loaded structures so we don't query FIND_STRUCTURES if we're just attacking/healing
-        let structuresLoaded = false;
-        let criticalRoads: Structure[] = [];
-        let containers: Structure[] = [];
-        let normalRoads: Structure[] = [];
-        let coreStructures: Structure[] = [];
-        let wallsAndRamparts: Structure[] = [];
+        if (hostiles.length > 0) {
+            // Sort by heal parts: Multi-heal > One-heal > Others
+            hostiles.sort((a, b) => {
+                const aHeal = a.getActiveBodyparts(HEAL);
+                const bHeal = b.getActiveBodyparts(HEAL);
+                if (aHeal !== bHeal) return bHeal - aHeal; // More heal parts first
+                return towers[0].pos.getRangeTo(a) - towers[0].pos.getRangeTo(b); // Then closest
+            });
 
+            const target = hostiles[0];
+            if (target) {
+                for (const tower of towers) {
+                    tower.attack(target);
+                }
+                // If towers are attacking enemies, no need to run any further find/search code
+                return;
+            }
+        }
+
+        // 2. HEAL PHASE (Injured Friendlies)
+        const injuredFriendlies = room.find(FIND_MY_CREEPS, { filter: c => c.hits < c.hitsMax });
+        if (injuredFriendlies.length > 0) {
+            const target = towers[0].pos.findClosestByRange(injuredFriendlies);
+            if (target) {
+                for (const tower of towers) {
+                    tower.heal(target);
+                }
+                // If tower is healing friendly, no other search code is needed
+                return;
+            }
+        }
+
+        // 3. REPAIR PHASE (Requires Tower Energy > 50%)
         const wallMaxHits = (COLONY_SETTINGS.roomWallMaxHits && COLONY_SETTINGS.roomWallMaxHits[room.name]) || COLONY_SETTINGS.wallMaxHits;
         const rampartMaxHits = (COLONY_SETTINGS.roomRampartMaxHits && COLONY_SETTINGS.roomRampartMaxHits[room.name]) || COLONY_SETTINGS.rampartMaxHits;
 
-        for (const tower of towers) {
-            // A tower requires at least 10 energy to perform ANY action (attack, heal, repair)
-            if (tower.store.getUsedCapacity(RESOURCE_ENERGY) < 10) continue;
+        // Shared repair target across all towers in the room
+        let target = Game.getObjectById(room.memory.towerRepairTargetId as Id<Structure>);
 
-            // Priority 1: Hostiles
-            if (hostiles.length > 0) {
-                const target = tower.pos.findClosestByRange(hostiles);
-                if (target) tower.attack(target);
-            } 
-            // Priority 2: Heal Creeps
-            else if (injuredCreeps.length > 0) {
-                const target = tower.pos.findClosestByRange(injuredCreeps);
-                if (target) tower.heal(target);
-            } 
-            // Priorities 3-6: Repair (Requires Tower Energy > 50%)
-            else if (tower.store.getUsedCapacity(RESOURCE_ENERGY) > tower.store.getCapacity(RESOURCE_ENERGY) * 0.5) {
-                
-                let target = Game.getObjectById(room.memory.towerRepairTargetId as Id<Structure>);
+        // Target Validation & "Search for others" logic
+        if (target) {
+            const isRoadCont = target.structureType === STRUCTURE_ROAD || target.structureType === STRUCTURE_CONTAINER;
+            
+            // "if target is repaired above 50%, search for other roads or containers below 25%"
+            if (isRoadCont && target.hits > target.hitsMax * 0.5) {
+                const hasCritical = room.find(FIND_STRUCTURES, {
+                    filter: s => (s.structureType === STRUCTURE_ROAD || s.structureType === STRUCTURE_CONTAINER) && s.hits < s.hitsMax * 0.25
+                }).length > 0;
+                if (hasCritical) target = null;
+            }
 
-                // Determine if we need to search for a new target
-                const needsNewTarget = !target || 
-                                       target.hits >= target.hitsMax || 
-                                       (target.structureType === STRUCTURE_WALL && target.hits >= wallMaxHits) ||
-                                       (target.structureType === STRUCTURE_RAMPART && target.hits >= rampartMaxHits);
+            // General completion check
+            if (target && (
+                target.hits >= target.hitsMax || 
+                (target.structureType === STRUCTURE_WALL && target.hits >= wallMaxHits) ||
+                (target.structureType === STRUCTURE_RAMPART && target.hits >= rampartMaxHits)
+            )) {
+                target = null;
+            }
+        }
 
-                if (needsNewTarget) {
-                    target = null;
-                    delete room.memory.towerRepairTargetId;
+        // Search logic (Throttle search but allow immediate search if no target exists)
+        if (!target || Game.time % 20 === 0) {
+            const allStructures = room.find(FIND_STRUCTURES);
 
-                    // Perform structure search (Throttle search execution but allow it when we have NO target)
-                    if (Game.time % 10 === 0 || !target) {
-                        if (!structuresLoaded) {
-                            const allStructures = room.find(FIND_STRUCTURES);
-                            
-                            // 1. Emergency Defense (Walls/Ramparts < 1000 hits)
-                            const emergencyWalls = allStructures.filter(s => 
-                                (s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART) && 
-                                s.hits < 1000
-                            );
+            // A. Roads/Containers < 25% (Critical)
+            const critical = allStructures.filter(s => 
+                (s.structureType === STRUCTURE_ROAD || s.structureType === STRUCTURE_CONTAINER) && 
+                s.hits < s.hitsMax * 0.25
+            );
+            if (critical.length > 0) target = towers[0].pos.findClosestByRange(critical);
 
-                            if (emergencyWalls.length > 0) {
-                                emergencyWalls.sort((a, b) => a.hits - b.hits);
-                                target = emergencyWalls[0];
-                            } else {
-                                // 2. Normal Maintenance
-                                coreStructures = allStructures.filter(s => 
-                                    s.structureType !== STRUCTURE_ROAD && 
-                                    s.structureType !== STRUCTURE_CONTAINER && 
-                                    s.structureType !== STRUCTURE_WALL && 
-                                    s.structureType !== STRUCTURE_RAMPART && 
-                                    s.hits < s.hitsMax
-                                );
-                                criticalRoads = allStructures.filter(s => s.structureType === STRUCTURE_ROAD && s.hits < s.hitsMax * 0.5);
-                                containers = allStructures.filter(s => s.structureType === STRUCTURE_CONTAINER && s.hits < s.hitsMax * 0.75);
-                                normalRoads = allStructures.filter(s => s.structureType === STRUCTURE_ROAD && s.hits < s.hitsMax * 0.95);
-                                wallsAndRamparts = allStructures.filter(s => 
-                                    (s.structureType === STRUCTURE_WALL && s.hits < wallMaxHits) ||
-                                    (s.structureType === STRUCTURE_RAMPART && s.hits < rampartMaxHits)
-                                );
+            // B. Walls/Ramparts < 1000 hits
+            if (!target) {
+                const emergencyWalls = allStructures.filter(s => 
+                    (s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART) && 
+                    s.hits < 1000
+                );
+                if (emergencyWalls.length > 0) target = towers[0].pos.findClosestByRange(emergencyWalls);
+            }
 
-                                if (coreStructures.length > 0) target = tower.pos.findClosestByRange(coreStructures);
-                                else if (criticalRoads.length > 0) target = tower.pos.findClosestByRange(criticalRoads);
-                                else if (containers.length > 0) target = tower.pos.findClosestByRange(containers);
-                                else if (normalRoads.length > 0) target = tower.pos.findClosestByRange(normalRoads);
-                                else if (wallsAndRamparts.length > 0) {
-                                    wallsAndRamparts.sort((a, b) => a.hits - b.hits);
-                                    target = wallsAndRamparts[0];
-                                }
-                            }
-                            structuresLoaded = true;
-                        }
+            // C. Roads/Containers < 90% (Maintenance)
+            if (!target) {
+                const maintenance = allStructures.filter(s => 
+                    (s.structureType === STRUCTURE_ROAD || s.structureType === STRUCTURE_CONTAINER) && 
+                    s.hits < s.hitsMax * 0.9
+                );
+                if (maintenance.length > 0) target = towers[0].pos.findClosestByRange(maintenance);
+            }
 
-                        if (target) {
-                            room.memory.towerRepairTargetId = target.id;
-                        }
-                    }
-                }
+            // D. Ramparts < Settings Max
+            if (!target) {
+                const ramparts = allStructures.filter(s => s.structureType === STRUCTURE_RAMPART && s.hits < rampartMaxHits);
+                if (ramparts.length > 0) target = towers[0].pos.findClosestByRange(ramparts);
+            }
 
-                if (target) {
+            // E. Walls < Settings Max
+            if (!target) {
+                const walls = allStructures.filter(s => s.structureType === STRUCTURE_WALL && s.hits < wallMaxHits);
+                if (walls.length > 0) target = towers[0].pos.findClosestByRange(walls);
+            }
+
+            if (target) {
+                room.memory.towerRepairTargetId = target.id;
+            } else {
+                delete room.memory.towerRepairTargetId;
+            }
+        }
+
+        // Final Execution for Repair
+        if (target) {
+            for (const tower of towers) {
+                // Ensure tower has enough energy to repair and is above 50% threshold
+                if (tower.store.getUsedCapacity(RESOURCE_ENERGY) > tower.store.getCapacity(RESOURCE_ENERGY) * 0.5) {
                     tower.repair(target);
                 }
             }
