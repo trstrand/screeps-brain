@@ -80,7 +80,7 @@ export const CREEP_CONFIGS: Record<string, RoleBodyConfig> = {
     breaker: {
         standard: [TOUGH, TOUGH, MOVE, MOVE, MOVE, MOVE, ATTACK, ATTACK, HEAL],
         //established: Array(5).fill(TOUGH).concat(Array(15).fill(MOVE)).concat(Array(10).fill(ATTACK)).concat(Array(5).fill(HEAL))
-        established: Array(24).fill(ATTACK).concat(Array(12).fill(MOVE))
+        established: Array(8).fill(ATTACK).concat(Array(8).fill(MOVE))
     },
     remoteBuilder: {
         starter: [WORK, CARRY, MOVE, MOVE],

@@ -43,6 +43,9 @@ export class TowerManager {
         }
 
         // 3. REPAIR PHASE (Requires Tower Energy > 50%)
+        const repairTowers = towers.filter(t => t.store.getUsedCapacity(RESOURCE_ENERGY) > t.store.getCapacity(RESOURCE_ENERGY) * 0.5);
+        if (repairTowers.length === 0) return;
+
         const wallMaxHits = (COLONY_SETTINGS.roomWallMaxHits && COLONY_SETTINGS.roomWallMaxHits[room.name]) || COLONY_SETTINGS.wallMaxHits;
         const rampartMaxHits = (COLONY_SETTINGS.roomRampartMaxHits && COLONY_SETTINGS.roomRampartMaxHits[room.name]) || COLONY_SETTINGS.rampartMaxHits;
 
@@ -80,15 +83,15 @@ export class TowerManager {
                 (s.structureType === STRUCTURE_ROAD || s.structureType === STRUCTURE_CONTAINER) && 
                 s.hits < s.hitsMax * 0.25
             );
-            if (critical.length > 0) target = towers[0].pos.findClosestByRange(critical);
+            if (critical.length > 0) target = repairTowers[0].pos.findClosestByRange(critical);
 
-            // B. Walls/Ramparts < 1000 hits
+            // B. Walls/Ramparts < 100 hits
             if (!target) {
                 const emergencyWalls = allStructures.filter(s => 
                     (s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART) && 
-                    s.hits < 1000
+                    s.hits < 100
                 );
-                if (emergencyWalls.length > 0) target = towers[0].pos.findClosestByRange(emergencyWalls);
+                if (emergencyWalls.length > 0) target = repairTowers[0].pos.findClosestByRange(emergencyWalls);
             }
 
             // C. Roads/Containers < 90% (Maintenance)
@@ -97,19 +100,19 @@ export class TowerManager {
                     (s.structureType === STRUCTURE_ROAD || s.structureType === STRUCTURE_CONTAINER) && 
                     s.hits < s.hitsMax * 0.9
                 );
-                if (maintenance.length > 0) target = towers[0].pos.findClosestByRange(maintenance);
+                if (maintenance.length > 0) target = repairTowers[0].pos.findClosestByRange(maintenance);
             }
 
             // D. Ramparts < Settings Max
             if (!target) {
                 const ramparts = allStructures.filter(s => s.structureType === STRUCTURE_RAMPART && s.hits < rampartMaxHits);
-                if (ramparts.length > 0) target = towers[0].pos.findClosestByRange(ramparts);
+                if (ramparts.length > 0) target = repairTowers[0].pos.findClosestByRange(ramparts);
             }
 
             // E. Walls < Settings Max
             if (!target) {
                 const walls = allStructures.filter(s => s.structureType === STRUCTURE_WALL && s.hits < wallMaxHits);
-                if (walls.length > 0) target = towers[0].pos.findClosestByRange(walls);
+                if (walls.length > 0) target = repairTowers[0].pos.findClosestByRange(walls);
             }
 
             if (target) {
@@ -121,11 +124,8 @@ export class TowerManager {
 
         // Final Execution for Repair
         if (target) {
-            for (const tower of towers) {
-                // Ensure tower has enough energy to repair and is above 50% threshold
-                if (tower.store.getUsedCapacity(RESOURCE_ENERGY) > tower.store.getCapacity(RESOURCE_ENERGY) * 0.5) {
-                    tower.repair(target);
-                }
+            for (const tower of repairTowers) {
+                tower.repair(target);
             }
         }
     }

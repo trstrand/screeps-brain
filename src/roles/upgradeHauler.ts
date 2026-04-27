@@ -43,7 +43,7 @@ export const roleUpgradeHauler: RoleHandler = {
             if (targetsWithSpace.length > 0) {
                 // Priority 1: Fill the container we are already standing next to
                 const adjacentTarget = targetsWithSpace.find(t => creep.pos.isNearTo(t));
-                
+
                 // Priority 2: Go to the one with the most space (or closest)
                 const target = adjacentTarget || targetsWithSpace.sort((a, b) => a.store[RESOURCE_ENERGY] - b.store[RESOURCE_ENERGY])[0];
 
@@ -52,7 +52,6 @@ export const roleUpgradeHauler: RoleHandler = {
                     creep.say('📥 Filling');
                 } else {
                     creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 5 });
-                    creep.say('🛰️ Moving');
                 }
             } else if (containers.length > 0) {
                 // ALL containers are full, park next to the closest one
@@ -114,21 +113,21 @@ export const roleUpgradeHauler: RoleHandler = {
                     if (extractor && storage) {
                         const mineralCandidates: (Resource | StructureContainer | Tombstone | Ruin)[] = [
                             ...creep.room.find(FIND_DROPPED_RESOURCES, {
-                                filter: (r: Resource) => r.resourceType !== RESOURCE_ENERGY && 
-                                             r.pos.inRangeTo(extractor, 1)
+                                filter: (r: Resource) => r.resourceType !== RESOURCE_ENERGY &&
+                                    r.pos.inRangeTo(extractor, 1)
                             }),
                             ...creep.room.find(FIND_STRUCTURES, {
                                 filter: (s: StructureContainer) => s.structureType === STRUCTURE_CONTAINER &&
-                                             s.pos.inRangeTo(extractor, 1) &&
-                                             Object.keys(s.store).some((r: string) => r !== RESOURCE_ENERGY && s.store[r as ResourceConstant] > 0)
+                                    s.pos.inRangeTo(extractor, 1) &&
+                                    Object.keys(s.store).some((r: string) => r !== RESOURCE_ENERGY && s.store[r as ResourceConstant] > 0)
                             }) as StructureContainer[],
                             ...creep.room.find(FIND_TOMBSTONES, {
-                                filter: (t: Tombstone) => t.pos.inRangeTo(extractor, 1) && 
-                                             Object.keys(t.store).some((r: string) => r !== RESOURCE_ENERGY && t.store[r as ResourceConstant] > 0)
+                                filter: (t: Tombstone) => t.pos.inRangeTo(extractor, 1) &&
+                                    Object.keys(t.store).some((r: string) => r !== RESOURCE_ENERGY && t.store[r as ResourceConstant] > 0)
                             }),
                             ...creep.room.find(FIND_RUINS, {
-                                filter: (r: Ruin) => r.pos.inRangeTo(extractor, 1) && 
-                                             Object.keys(r.store).some((res: string) => res !== RESOURCE_ENERGY && r.store[res as ResourceConstant] > 0)
+                                filter: (r: Ruin) => r.pos.inRangeTo(extractor, 1) &&
+                                    Object.keys(r.store).some((res: string) => res !== RESOURCE_ENERGY && r.store[res as ResourceConstant] > 0)
                             })
                         ];
                         target = creep.pos.findClosestByRange(mineralCandidates);
@@ -159,7 +158,7 @@ export const roleUpgradeHauler: RoleHandler = {
                                     // Controller containers are now range 2
                                     const isControllerContainer = creep.room.controller && s.pos.inRangeTo(creep.room.controller, 2);
                                     const isSourceContainer = s.pos.findInRange(FIND_SOURCES, 2).length > 0;
-                                    
+
                                     return s.store[RESOURCE_ENERGY] > 100 && (isSourceContainer || !isControllerContainer);
                                 }
                                 return false;
@@ -188,10 +187,10 @@ export const roleUpgradeHauler: RoleHandler = {
                         // 2. Withdraw from target structure
                         const extractor = creep.room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTRACTOR } })[0];
                         const storage = creep.room.storage;
-                        
+
                         // Only withdraw minerals if we have the infrastructure to handle them
                         const canHandleMinerals = extractor && storage;
-                        const resourceToWithdraw = canHandleMinerals 
+                        const resourceToWithdraw = canHandleMinerals
                             ? (Object.keys(target.store).find((r: string) => target.store[r as ResourceConstant] > 0) as ResourceConstant || RESOURCE_ENERGY)
                             : RESOURCE_ENERGY;
 
@@ -206,8 +205,8 @@ export const roleUpgradeHauler: RoleHandler = {
                         const hasMoreEnergyNearby = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 5, {
                             filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0
                         }).length > 0 || (
-                            'store' in target && target.store[RESOURCE_ENERGY] > 50
-                        );
+                                'store' in target && target.store[RESOURCE_ENERGY] > 50
+                            );
 
                         if (!hasMoreEnergyNearby) {
                             creep.memory.working = true;
@@ -221,7 +220,7 @@ export const roleUpgradeHauler: RoleHandler = {
                         const droppedNearStorage = target.pos.findInRange(FIND_DROPPED_RESOURCES, 5, {
                             filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 20
                         })[0];
-                        
+
                         if (droppedNearStorage) {
                             creep.moveTo(droppedNearStorage, { visualizePathStyle: { stroke: '#ffaa00' } });
                             return;
