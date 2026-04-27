@@ -85,7 +85,8 @@ export const CREEP_CONFIGS: Record<string, RoleBodyConfig> = {
         sentinel: [WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE],
         bastion: Array(6).fill(WORK).concat([CARRY]).concat(Array(4).fill(MOVE)),
         citadel: Array(8).fill(WORK).concat([CARRY]).concat(Array(6).fill(MOVE)),
-        apex: Array(10).fill(WORK).concat([CARRY]).concat(Array(8).fill(MOVE))
+        apex: Array(8).fill(WORK).concat([CARRY]).concat(Array(6).fill(MOVE)),
+        //apex: Array(10).fill(WORK).concat([CARRY]).concat(Array(8).fill(MOVE))
     },
     remoteHauler: {
         vanguard: [CARRY, CARRY, CARRY, MOVE, MOVE, MOVE],

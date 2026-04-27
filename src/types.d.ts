@@ -43,8 +43,6 @@ declare global {
         salvageRoom?: string;
         remoteBuild?: string;
         claimRoom?: string;
-        wallMaxHits: number;
-        rampartMaxHits: number;
         roomWallMaxHits?: { [roomName: string]: number };
         roomRampartMaxHits?: { [roomName: string]: number };
         attackWalls: boolean;

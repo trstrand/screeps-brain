@@ -24,8 +24,8 @@ export const roleRepairer: RoleHandler = {
             }
 
             // --- SETTINGS ---
-            const wallMaxHits = (COLONY_SETTINGS.roomWallMaxHits && COLONY_SETTINGS.roomWallMaxHits[creep.room.name]) || COLONY_SETTINGS.wallMaxHits;
-            const rampartMaxHits = (COLONY_SETTINGS.roomRampartMaxHits && COLONY_SETTINGS.roomRampartMaxHits[creep.room.name]) || COLONY_SETTINGS.rampartMaxHits;
+            const wallMaxHits = (COLONY_SETTINGS.roomWallMaxHits && COLONY_SETTINGS.roomWallMaxHits[creep.room.name]) || 1000;
+            const rampartMaxHits = (COLONY_SETTINGS.roomRampartMaxHits && COLONY_SETTINGS.roomRampartMaxHits[creep.room.name]) || 1000;
 
             // --- TARGET SELECTION ---
             let target = Game.getObjectById((creep.memory as any).repairTargetId as Id<Structure>);

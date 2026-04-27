@@ -46,8 +46,8 @@ export class TowerManager {
         const repairTowers = towers.filter(t => t.store.getUsedCapacity(RESOURCE_ENERGY) > t.store.getCapacity(RESOURCE_ENERGY) * 0.5);
         if (repairTowers.length === 0) return;
 
-        const wallMaxHits = (COLONY_SETTINGS.roomWallMaxHits && COLONY_SETTINGS.roomWallMaxHits[room.name]) || COLONY_SETTINGS.wallMaxHits;
-        const rampartMaxHits = (COLONY_SETTINGS.roomRampartMaxHits && COLONY_SETTINGS.roomRampartMaxHits[room.name]) || COLONY_SETTINGS.rampartMaxHits;
+        const wallMaxHits = (COLONY_SETTINGS.roomWallMaxHits && COLONY_SETTINGS.roomWallMaxHits[room.name]) || 1000;
+        const rampartMaxHits = (COLONY_SETTINGS.roomRampartMaxHits && COLONY_SETTINGS.roomRampartMaxHits[room.name]) || 1000;
 
         // Shared repair target across all towers in the room
         let target = Game.getObjectById(room.memory.towerRepairTargetId as Id<Structure>);
