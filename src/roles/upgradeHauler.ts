@@ -184,8 +184,16 @@ export const roleUpgradeHauler: RoleHandler = {
                     if (droppedNearby) {
                         creep.pickup(droppedNearby);
                     } else if ('store' in target) {
-                        // 2. Withdraw from target structure (minerals if any, else energy)
-                        const resourceToWithdraw = Object.keys(target.store).find((r: string) => target.store[r as ResourceConstant] > 0) as ResourceConstant || RESOURCE_ENERGY;
+                        // 2. Withdraw from target structure
+                        const extractor = creep.room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTRACTOR } })[0];
+                        const storage = creep.room.storage;
+                        
+                        // Only withdraw minerals if we have the infrastructure to handle them
+                        const canHandleMinerals = extractor && storage;
+                        const resourceToWithdraw = canHandleMinerals 
+                            ? (Object.keys(target.store).find((r: string) => target.store[r as ResourceConstant] > 0) as ResourceConstant || RESOURCE_ENERGY)
+                            : RESOURCE_ENERGY;
+
                         creep.withdraw(target, resourceToWithdraw);
                     } else if ('amount' in target) {
                         // 3. Target was already a dropped resource
