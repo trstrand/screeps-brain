@@ -157,7 +157,7 @@ export class SpawnManager {
             if (role === 'builder' && targetCount > 0 && room.find(FIND_CONSTRUCTION_SITES).length === 0) targetCount = 0;
             if (role === 'upgradeHauler' && targetCount > 0) {
                 const controller = room.controller;
-                const containerNearController = controller ? controller.pos.findInRange(FIND_STRUCTURES, 4, {
+                const containerNearController = controller ? controller.pos.findInRange(FIND_STRUCTURES, 1, {
                     filter: s => s.structureType === STRUCTURE_CONTAINER
                 }).length > 0 : false;
                 if (!containerNearController) targetCount = 0;

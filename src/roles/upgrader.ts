@@ -1,44 +1,21 @@
 import { COLONY_SETTINGS } from '../config/settings';
+import { RoleHandler } from '../types';
 
 export const roleUpgrader: RoleHandler = {
     run(creep: Creep): void {
-        // --- 1. DYNAMIC CONTAINER NEGOTIATION ---
-        let upgradeContainer = Game.getObjectById(creep.memory.targetContainerId as Id<StructureContainer | StructureLink>);
+        // --- 1. IDENTIFY INFRASTRUCTURE ---
+        const controller = creep.room.controller;
+        if (!controller) return;
 
-        if (!upgradeContainer) {
-            delete creep.memory.targetContainerId;
-            if (creep.room.controller) {
-                // Find containers close to the controller (range <= 3 for upgrading)
-                // and explicitly exclude containers that are adjacent to sources (source containers)
-                let containers = creep.room.find(FIND_STRUCTURES, {
-                    filter: s => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_LINK) &&
-                        s.pos.getRangeTo(creep.room.controller!) <= 3 &&
-                        s.pos.findInRange(FIND_SOURCES, 1).length === 0
-                }) as (StructureContainer | StructureLink)[];
+        // Find the one container near the controller (range 1)
+        const container = controller.pos.findInRange(FIND_STRUCTURES, 1, {
+            filter: s => s.structureType === STRUCTURE_CONTAINER
+        })[0] as StructureContainer | undefined;
 
-                // Sort to prefer links (especially with energy), then by distance
-                containers.sort((a, b) => {
-                    const aScore = a.structureType === STRUCTURE_LINK ? (a.store[RESOURCE_ENERGY] > 0 ? 2 : 1) : 0;
-                    const bScore = b.structureType === STRUCTURE_LINK ? (b.store[RESOURCE_ENERGY] > 0 ? 2 : 1) : 0;
-                    if (aScore !== bScore) return bScore - aScore;
-                    return a.pos.getRangeTo(creep.room.controller!) - b.pos.getRangeTo(creep.room.controller!);
-                });
-
-                const otherUpgraders = Object.values(Game.creeps).filter(c =>
-                    c.memory.role === creep.memory.role &&
-                    c.id !== creep.id &&
-                    c.memory.targetContainerId
-                );
-                const claimedIds = otherUpgraders.map(c => c.memory.targetContainerId);
-
-                const availableContainer = containers.find(c => !claimedIds.includes(c.id));
-
-                if (availableContainer) {
-                    creep.memory.targetContainerId = availableContainer.id;
-                    upgradeContainer = availableContainer;
-                }
-            }
-        }
+        // Find the link near the controller (range 3)
+        const link = controller.pos.findInRange(FIND_MY_STRUCTURES, 3, {
+            filter: s => s.structureType === STRUCTURE_LINK
+        })[0] as StructureLink | undefined;
 
         // --- 2. STATE MAINTENANCE ---
         if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) {
@@ -52,27 +29,21 @@ export const roleUpgrader: RoleHandler = {
             creep.say('⚡ Upgrade');
         }
 
-        const controller = creep.room.controller;
-        if (!controller) return;
-
         // --- 3. WORK PHASE ---
         if (creep.memory.working) {
-            if (upgradeContainer) {
-                // Static Upgrader Logic
-                if (!creep.pos.isEqualTo(upgradeContainer.pos)) {
-                    creep.moveTo(upgradeContainer, { range: 0, visualizePathStyle: { stroke: '#ffffff' } });
+            if (container) {
+                // Static Upgrader Logic: Stand directly on the container
+                if (!creep.pos.isEqualTo(container.pos)) {
+                    creep.moveTo(container, { range: 0, visualizePathStyle: { stroke: '#ffffff' } });
                 }
 
                 if (creep.upgradeController(controller) === ERR_NOT_IN_RANGE) {
                     creep.moveTo(controller, { range: 3 });
                 }
 
-                // Auto-repair the container under feet
-                const containerAtPos = creep.pos.lookFor(LOOK_STRUCTURES).find(
-                    s => s.structureType === STRUCTURE_CONTAINER
-                ) as StructureContainer | undefined;
-                if (containerAtPos && containerAtPos.hits < containerAtPos.hitsMax * 0.99) {
-                    creep.repair(containerAtPos);
+                // Repair container under feet if damaged
+                if (container.hits < container.hitsMax * 0.99) {
+                    creep.repair(container);
                     creep.say('🔧 Repair');
                 }
             } else {
@@ -87,14 +58,25 @@ export const roleUpgrader: RoleHandler = {
         }
         // --- 4. COLLECTION PHASE ---
         else {
-            if (upgradeContainer && upgradeContainer.store[RESOURCE_ENERGY] > 0) {
-                if (creep.withdraw(upgradeContainer, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                    creep.moveTo(upgradeContainer, { range: 0 });
+            if (container) {
+                // Priority 1: Pull from the Link if it has energy
+                if (link && link.store[RESOURCE_ENERGY] > 0) {
+                    if (creep.withdraw(link, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                        creep.moveTo(container, { range: 0 }); // Move to the container to pull from the link
+                    }
+                    return;
                 }
-                return;
+                
+                // Priority 2: Pull from the Container
+                if (container.store[RESOURCE_ENERGY] > 0) {
+                    if (creep.withdraw(container, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                        creep.moveTo(container, { range: 0 });
+                    }
+                    return;
+                }
             }
 
-            // FALLBACKS (Target Fixation for Fallbacks)
+            // --- FALLBACKS --- (If no container, or if container and link are both empty)
             let target: any = null;
             if (creep.memory.targetId) {
                 target = Game.getObjectById(creep.memory.targetId as Id<any>);
@@ -117,11 +99,11 @@ export const roleUpgrader: RoleHandler = {
                 ];
                 target = creep.pos.findClosestByRange(lootCandidates);
 
-                // Fallback B: Other storage/containers
+                // Fallback B: Other storage/containers (Not the controller container)
                 if (!target) {
                     target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
                         filter: s => (s.structureType === STRUCTURE_STORAGE || s.structureType === STRUCTURE_CONTAINER) &&
-                            s.store[RESOURCE_ENERGY] > 0 && s.id !== upgradeContainer?.id
+                            s.store[RESOURCE_ENERGY] > 0 && s.id !== container?.id
                     });
                 }
 

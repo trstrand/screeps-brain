@@ -33,34 +33,25 @@ export const roleUpgradeHauler: RoleHandler = {
             const controller = creep.room.controller;
             if (!controller) return;
 
-            // Find ALL containers near the controller (range 2)
-            const containers = controller.pos.findInRange(FIND_STRUCTURES, 2, {
+            // Find the single container near the controller (range 1)
+            const targetContainer = controller.pos.findInRange(FIND_STRUCTURES, 1, {
                 filter: (s) => s.structureType === STRUCTURE_CONTAINER
-            }) as StructureContainer[];
+            })[0] as StructureContainer | undefined;
 
-            const targetsWithSpace = containers.filter(c => c.store.getFreeCapacity(RESOURCE_ENERGY) > 0);
-
-            if (targetsWithSpace.length > 0) {
-                // Priority 1: Fill the container we are already standing next to
-                const adjacentTarget = targetsWithSpace.find(t => creep.pos.isNearTo(t));
-
-                // Priority 2: Go to the one with the most space (or closest)
-                const target = adjacentTarget || targetsWithSpace.sort((a, b) => a.store[RESOURCE_ENERGY] - b.store[RESOURCE_ENERGY])[0];
-
-                if (creep.pos.isNearTo(target)) {
-                    creep.transfer(target, RESOURCE_ENERGY);
-                    creep.say('📥 Filling');
+            if (targetContainer) {
+                if (targetContainer.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                    if (creep.pos.isNearTo(targetContainer)) {
+                        creep.transfer(targetContainer, RESOURCE_ENERGY);
+                        creep.say('📥 Filling');
+                    } else {
+                        creep.moveTo(targetContainer, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 5 });
+                    }
                 } else {
-                    creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 5 });
-                }
-            } else if (containers.length > 0) {
-                // ALL containers are full, park next to the closest one
-                const closest = creep.pos.findClosestByRange(containers);
-                if (closest) {
-                    if (creep.pos.isNearTo(closest)) {
+                    // Container is full, park next to it
+                    if (creep.pos.isNearTo(targetContainer)) {
                         creep.say('⌛ Waiting');
                     } else {
-                        creep.moveTo(closest, { range: 1, visualizePathStyle: { stroke: '#ffffff' } });
+                        creep.moveTo(targetContainer, { range: 1, visualizePathStyle: { stroke: '#ffffff' } });
                     }
                 }
             } else {
@@ -151,11 +142,9 @@ export const roleUpgradeHauler: RoleHandler = {
                                 if (s.structureType === STRUCTURE_STORAGE) {
                                     return s.store[RESOURCE_ENERGY] > 0;
                                 }
-                                // Containers are valid if they have energy and AREN'T the controller containers
-                                // Controller containers are defined as range 1 (directly next to controller)
+                                // Containers are valid if they have energy and AREN'T the controller container
                                 if (s.structureType === STRUCTURE_CONTAINER) {
-                                    // Controller containers are now range 2
-                                    const isControllerContainer = creep.room.controller && s.pos.inRangeTo(creep.room.controller, 2);
+                                    const isControllerContainer = creep.room.controller && s.pos.inRangeTo(creep.room.controller, 1);
                                     const isSourceContainer = s.pos.findInRange(FIND_SOURCES, 2).length > 0;
 
                                     return s.store[RESOURCE_ENERGY] > 100 && (isSourceContainer || !isControllerContainer);
