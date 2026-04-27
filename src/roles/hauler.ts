@@ -86,7 +86,9 @@ export const roleHauler: RoleHandler = {
                     });
                 }
 
-                if (!target) target = creep.room.storage;
+                if (!target && creep.room.storage && creep.room.storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                    target = creep.room.storage;
+                }
                 
                 if (target) creep.memory.deliveryTargetId = target.id;
             }
@@ -158,13 +160,18 @@ export const roleHauler: RoleHandler = {
 
             // D. Find New Target Globally
             if (!target) {
-                if (creep.memory.idleTicks && creep.memory.idleTicks > 0) {
+                // "Storage Sweep" Logic: If base is full and storage has room, be aggressive
+                const storageHasSpace = creep.room.storage && creep.room.storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
+                const baseFull = !this.roomNeedsEnergy(creep.room);
+                const shouldSweep = storageHasSpace && baseFull;
+
+                if (creep.memory.idleTicks && creep.memory.idleTicks > 0 && !shouldSweep) {
                     creep.memory.idleTicks--;
                 } else {
                     // Priority 1: Dropped energy near sources (Overflow)
                     const overflowEnergy = creep.room.find(FIND_DROPPED_RESOURCES, {
                         filter: r => r.resourceType === RESOURCE_ENERGY && 
-                                     r.amount > 50 && // Prioritize smaller overflow
+                                     r.amount > 50 && 
                                      r.pos.findInRange(FIND_SOURCES, 2).length > 0
                     });
 
@@ -172,7 +179,7 @@ export const roleHauler: RoleHandler = {
                         target = creep.pos.findClosestByRange(overflowEnergy);
                     }
 
-                    // Priority 2: Other candidates (Tombstones, regular dropped, containers)
+                    // Priority 2: Other candidates (Tombstones, regular dropped, containers > 150)
                     if (!target) {
                         const candidates = this.getCollectionCandidates(creep);
                         target = creep.pos.findClosestByRange(candidates);
