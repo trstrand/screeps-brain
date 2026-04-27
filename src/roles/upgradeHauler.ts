@@ -33,8 +33,8 @@ export const roleUpgradeHauler: RoleHandler = {
             const controller = creep.room.controller;
             if (!controller) return;
 
-            // Find ALL containers directly adjacent to the controller (range 1)
-            const containers = controller.pos.findInRange(FIND_STRUCTURES, 1, {
+            // Find ALL containers near the controller (range 2)
+            const containers = controller.pos.findInRange(FIND_STRUCTURES, 2, {
                 filter: (s) => s.structureType === STRUCTURE_CONTAINER
             }) as StructureContainer[];
 
@@ -66,9 +66,10 @@ export const roleUpgradeHauler: RoleHandler = {
                     }
                 }
             } else {
-                creep.say('⌛ No Cont');
                 if (creep.pos.getRangeTo(controller) > 5) {
-                    creep.moveTo(controller, { range: 5 });
+                    creep.moveTo(controller, { range: 5, visualizePathStyle: { stroke: '#ffffff' } });
+                } else {
+                    creep.say('⌛ No Cont');
                 }
             }
         }
