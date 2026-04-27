@@ -105,27 +105,33 @@ export const roleUpgradeHauler: RoleHandler = {
             }
 
             if (!target) {
-                // Priority A: Minerals (Only if not already carrying energy)
+                // Priority A: Minerals (Only if extractor and storage exist)
                 if (!hasEnergy) {
-                    const mineralCandidates: (Resource | StructureContainer | Tombstone | Ruin)[] = [
-                        ...creep.room.find(FIND_DROPPED_RESOURCES, {
-                            filter: (r: Resource) => r.resourceType !== RESOURCE_ENERGY && 
-                                         r.pos.findInRange(FIND_MINERALS, 3).length > 0
-                        }),
-                        ...creep.room.find(FIND_STRUCTURES, {
-                            filter: (s: StructureContainer) => s.structureType === STRUCTURE_CONTAINER &&
-                                         s.store.getUsedCapacity() > 100 &&
-                                         s.pos.findInRange(FIND_MINERALS, 3).length > 0
-                        }) as StructureContainer[],
-                        ...creep.room.find(FIND_TOMBSTONES, {
-                            filter: (t: Tombstone) => Object.keys(t.store).some((r: string) => r !== RESOURCE_ENERGY && t.store[r as ResourceConstant] > 0)
-                        }),
-                        ...creep.room.find(FIND_RUINS, {
-                            filter: (r: Ruin) => Object.keys(r.store).some((res: string) => res !== RESOURCE_ENERGY && r.store[res as ResourceConstant] > 0)
-                        })
-                    ];
+                    const extractor = creep.room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTRACTOR } })[0];
+                    const storage = creep.room.storage;
 
-                    target = creep.pos.findClosestByRange(mineralCandidates);
+                    if (extractor && storage) {
+                        const mineralCandidates: (Resource | StructureContainer | Tombstone | Ruin)[] = [
+                            ...creep.room.find(FIND_DROPPED_RESOURCES, {
+                                filter: (r: Resource) => r.resourceType !== RESOURCE_ENERGY && 
+                                             r.pos.inRangeTo(extractor, 1)
+                            }),
+                            ...creep.room.find(FIND_STRUCTURES, {
+                                filter: (s: StructureContainer) => s.structureType === STRUCTURE_CONTAINER &&
+                                             s.pos.inRangeTo(extractor, 1) &&
+                                             Object.keys(s.store).some((r: string) => r !== RESOURCE_ENERGY && s.store[r as ResourceConstant] > 0)
+                            }) as StructureContainer[],
+                            ...creep.room.find(FIND_TOMBSTONES, {
+                                filter: (t: Tombstone) => t.pos.inRangeTo(extractor, 1) && 
+                                             Object.keys(t.store).some((r: string) => r !== RESOURCE_ENERGY && t.store[r as ResourceConstant] > 0)
+                            }),
+                            ...creep.room.find(FIND_RUINS, {
+                                filter: (r: Ruin) => r.pos.inRangeTo(extractor, 1) && 
+                                             Object.keys(r.store).some((res: string) => res !== RESOURCE_ENERGY && r.store[res as ResourceConstant] > 0)
+                            })
+                        ];
+                        target = creep.pos.findClosestByRange(mineralCandidates);
+                    }
                 }
 
                 // Priority B: Energy (Only if not already carrying minerals)
