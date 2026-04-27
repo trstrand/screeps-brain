@@ -42,16 +42,20 @@ export const roleSalvager: RoleHandler = {
 
             if (!target) {
                 // FIND TARGETS WITH PRIORITY
-                // 1. Dropped Resources
+                // 1. Dropped Resources (Higher threshold near sources to avoid trickle-feeding)
                 const dropped = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
-                    filter: (r) => r.amount > 50
+                    filter: (r: Resource) => {
+                        const isNearSource = r.pos.findInRange(FIND_SOURCES, 2).length > 0;
+                        if (isNearSource) return r.amount > 400; // Ignore small miner overflow
+                        return r.amount > 50;
+                    }
                 });
 
                 // 2. Tombstones
-                const tombstone = !dropped ? creep.pos.findClosestByRange(FIND_TOMBSTONES, { filter: (t) => t.store.getUsedCapacity() > 50 }) : null;
+                const tombstone = !dropped ? creep.pos.findClosestByRange(FIND_TOMBSTONES, { filter: (t: Tombstone) => t.store.getUsedCapacity() > 100 }) : null;
 
                 // 3. Ruins
-                const ruin = (!dropped && !tombstone) ? creep.pos.findClosestByRange(FIND_RUINS, { filter: (r) => r.store.getUsedCapacity() > 50 }) : null;
+                const ruin = (!dropped && !tombstone) ? creep.pos.findClosestByRange(FIND_RUINS, { filter: (r: Ruin) => r.store.getUsedCapacity() > 100 }) : null;
 
                 // 4. Hostile/Leftover Structures
                 let hostileStore: AnyStoreStructure | null = null;
@@ -101,13 +105,21 @@ export const roleSalvager: RoleHandler = {
 
                     // --- POST-INTERACTION: Move on if area is empty ---
                     if (creep.store.getUsedCapacity() > 0) {
-                        const moreNearby = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 5, { filter: r => r.amount > 50 }).length > 0 ||
-                                         ('store' in target && target.store.getUsedCapacity() > 50);
+                        const moreNearby = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 5, { 
+                            filter: (r: Resource) => {
+                                const isNearSource = r.pos.findInRange(FIND_SOURCES, 2).length > 0;
+                                return isNearSource ? r.amount > 400 : r.amount > 50;
+                            }
+                        }).length > 0 || (
+                            'store' in target && target.store.getUsedCapacity() > 100
+                        );
                         
                         if (!moreNearby) {
                             delete creep.memory.targetId;
                             // Re-evaluate or go deposit if no big targets nearby
-                            const nextTarget = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, { filter: r => r.amount > 100 && creep.pos.getRangeTo(r) > 5 });
+                            const nextTarget = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, { 
+                                filter: (r: Resource) => r.amount > 100 && creep.pos.getRangeTo(r) > 5 
+                            });
                             if (!nextTarget) {
                                 creep.memory.working = false;
                                 creep.say('📦 Enough');

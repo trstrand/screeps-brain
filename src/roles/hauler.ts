@@ -52,7 +52,15 @@ export const roleHauler: RoleHandler = {
             let target: any = null;
             if (creep.memory.deliveryTargetId) {
                 target = Game.getObjectById(creep.memory.deliveryTargetId as Id<any>);
-                if (target && target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0) {
+                
+                // Drop fixation if target is full
+                const isFull = target && target.store && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0;
+                
+                // Drop fixation if we are targeting a TOWER but SPAWNS/EXTENSIONS need energy
+                const targetIsTower = target && target.structureType === STRUCTURE_TOWER;
+                const spawnsNeedEnergy = targetIsTower && this.roomSpawnsNeedEnergy(creep.room);
+
+                if (!target || isFull || spawnsNeedEnergy) {
                     target = null;
                     delete creep.memory.deliveryTargetId;
                 }
