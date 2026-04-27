@@ -1,5 +1,5 @@
 import { COLONY_SETTINGS } from '../config/settings';
-import { RoleHandler } from '../types';
+
 
 export const roleUpgrader: RoleHandler = {
     run(creep: Creep): void {

@@ -209,9 +209,14 @@ export const roleHauler: RoleHandler = {
                     const sourceLink2 = Game.getObjectById(creep.room.memory.sourceLink2 as Id<StructureLink>);
                     const hasSourceLink = !!sourceLink1 || !!sourceLink2;
 
-                    // Priority 2.5: Shuttle FROM storageLink TO storage if base is full and source links exist
-                    if (!target && baseFull && hasSourceLink && storageLink && storageLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                        target = storageLink;
+                    // Priority 2.5: Pull from storageLink if base needs energy OR (shuttle logic: base is full and source links exist)
+                    const needsEnergy = !baseFull;
+                    const canShuttleFromLink = baseFull && hasSourceLink;
+                    
+                    if (!target && storageLink && storageLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        if (needsEnergy || canShuttleFromLink) {
+                            target = storageLink;
+                        }
                     }
 
                     // Priority 3: Storage Fallback
