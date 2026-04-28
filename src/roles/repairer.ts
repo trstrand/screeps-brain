@@ -125,7 +125,7 @@ export const roleRepairer: RoleHandler = {
             if (creep.memory.targetId) {
                 target = Game.getObjectById(creep.memory.targetId as Id<any>);
                 const hasResources = target && (
-                    ('store' in target && target.store.getUsedCapacity(RESOURCE_ENERGY) > 0) ||
+                    ('store' in target && target.store.getUsedCapacity(RESOURCE_ENERGY) > 25) ||
                     ('amount' in target && target.amount > 0) ||
                     (target instanceof Source && target.energy > 0)
                 );

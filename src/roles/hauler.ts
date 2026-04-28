@@ -23,6 +23,7 @@ export const roleHauler: RoleHandler = {
         const allDrops = creep.room.find(FIND_DROPPED_RESOURCES);
         const allTombstones = creep.room.find(FIND_TOMBSTONES);
         const allContainers = creep.room.find(FIND_STRUCTURES, { filter: s => s.structureType === STRUCTURE_CONTAINER }) as StructureContainer[];
+        const mySpawns = creep.room.find(FIND_MY_SPAWNS);
 
         // --- 0. JUNK MANAGEMENT ---
         const junkResource = Object.keys(creep.store).find(r => r !== RESOURCE_ENERGY) as ResourceConstant | undefined;
@@ -134,7 +135,7 @@ export const roleHauler: RoleHandler = {
                     creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 5 });
                 }
             } else {
-                const parkTarget = creep.pos.findClosestByRange(FIND_MY_SPAWNS);
+                const parkTarget = creep.pos.findClosestByRange(mySpawns);
                 if (parkTarget && creep.pos.getRangeTo(parkTarget) > 5) {
                     creep.moveTo(parkTarget, { range: 5, visualizePathStyle: { stroke: '#ffffff' } });
                 }
@@ -162,13 +163,12 @@ export const roleHauler: RoleHandler = {
 
                 // 2. Check if a Priority 1 target appeared while we are chasing something else
                 // (Only pre-empt if our current target is NOT already Priority 1)
-                const spawns = creep.room.find(FIND_MY_SPAWNS);
                 const p1Targets = [
-                    ...allDrops.filter(r => r.resourceType === RESOURCE_ENERGY && r.amount > 0 && spawns.some(s => r.pos.inRangeTo(s, 3))),
-                    ...allTombstones.filter(t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && t.creep.my && spawns.some(s => t.pos.inRangeTo(s, 3)))
+                    ...allDrops.filter(r => r.resourceType === RESOURCE_ENERGY && r.amount > 0 && mySpawns.some(s => r.pos.inRangeTo(s, 3))),
+                    ...allTombstones.filter(t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && t.creep.my && mySpawns.some(s => t.pos.inRangeTo(s, 3)))
                 ];
 
-                const currentTargetIsP1 = target && spawns.some(s => target.pos.inRangeTo(s, 3));
+                const currentTargetIsP1 = target && mySpawns.some(s => target.pos.inRangeTo(s, 3));
                 const targetIsHub = target && (target.structureType === STRUCTURE_STORAGE || target.structureType === STRUCTURE_LINK);
                 const shouldPreempt = p1Targets.length > 0 && !currentTargetIsP1 && !targetIsHub;
 
@@ -239,9 +239,8 @@ export const roleHauler: RoleHandler = {
                 }
 
                 // Priority 1: Tombstones and dropped energy near Spawns
-                const spawns = creep.room.find(FIND_MY_SPAWNS);
                 const nearbyDrops: any[] = [];
-                for (const spawn of spawns) {
+                for (const spawn of mySpawns) {
                     nearbyDrops.push(...allDrops.filter(r => r.resourceType === RESOURCE_ENERGY && r.amount > 0 && r.pos.inRangeTo(spawn, 3)));
                     nearbyDrops.push(...allTombstones.filter(t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && t.creep.my && t.pos.inRangeTo(spawn, 3)));
                 }
