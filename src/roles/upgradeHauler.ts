@@ -1,5 +1,9 @@
 export const roleUpgradeHauler: RoleHandler = {
     run(creep: Creep): void {
+        // --- PRE-LOAD CACHE ---
+        const allDrops = creep.room.find(FIND_DROPPED_RESOURCES);
+        const allTombstones = creep.room.find(FIND_TOMBSTONES);
+
         // 1. STATE MACHINE
         if (creep.memory.working && creep.store.getUsedCapacity() === 0) {
             creep.memory.working = false;
@@ -21,6 +25,13 @@ export const roleUpgradeHauler: RoleHandler = {
                 const storage = creep.room.storage;
                 if (storage) {
                     if (creep.transfer(storage, mineralType) === ERR_NOT_IN_RANGE) {
+                        // --- VACUUM LOGIC ---
+                        if (creep.store.getFreeCapacity() > 0) {
+                            const vacDrop = creep.pos.findInRange(allDrops, 1, { filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0 })[0];
+                            const vacTomb = creep.pos.findInRange(allTombstones, 1, { filter: (t: Tombstone) => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
+                            if (vacDrop) creep.pickup(vacDrop);
+                            else if (vacTomb) creep.withdraw(vacTomb, RESOURCE_ENERGY);
+                        }
                         creep.moveTo(storage, { visualizePathStyle: { stroke: '#ffffff' } });
                     }
                 } else {
@@ -44,6 +55,13 @@ export const roleUpgradeHauler: RoleHandler = {
                         creep.transfer(targetContainer, RESOURCE_ENERGY);
                         creep.say('📥 Filling');
                     } else {
+                        // --- VACUUM LOGIC ---
+                        if (creep.store.getFreeCapacity() > 0) {
+                            const vacDrop = creep.pos.findInRange(allDrops, 1, { filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0 })[0];
+                            const vacTomb = creep.pos.findInRange(allTombstones, 1, { filter: (t: Tombstone) => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
+                            if (vacDrop) creep.pickup(vacDrop);
+                            else if (vacTomb) creep.withdraw(vacTomb, RESOURCE_ENERGY);
+                        }
                         creep.moveTo(targetContainer, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 5 });
                     }
                 } else {
@@ -209,12 +227,34 @@ export const roleUpgradeHauler: RoleHandler = {
                             filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 20
                         })[0];
 
-                        if (droppedNearStorage) {
-                            creep.moveTo(droppedNearStorage, { visualizePathStyle: { stroke: '#ffaa00' } });
-                            return;
+                    if (droppedNearStorage) {
+                        creep.moveTo(droppedNearStorage, { visualizePathStyle: { stroke: '#ffaa00' } });
+                        return;
+                    }
+                }
+
+                // --- VACUUM LOGIC (FETCH) ---
+                if (creep.store.getFreeCapacity() > 0) {
+                    const vacDrop = creep.pos.findInRange(allDrops, 1, { filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0 })[0];
+                    const vacTomb = creep.pos.findInRange(allTombstones, 1, { filter: (t: Tombstone) => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
+                    
+                    if (vacDrop) {
+                        creep.pickup(vacDrop);
+                        if (creep.store.getUsedCapacity() + vacDrop.amount >= creep.store.getCapacity()) {
+                            creep.memory.working = true;
+                            delete creep.memory.targetId;
+                            creep.say('📦 Full!');
+                        }
+                    } else if (vacTomb) {
+                        creep.withdraw(vacTomb, RESOURCE_ENERGY);
+                        if (creep.store.getUsedCapacity() + vacTomb.store.getUsedCapacity(RESOURCE_ENERGY) >= creep.store.getCapacity()) {
+                            creep.memory.working = true;
+                            delete creep.memory.targetId;
+                            creep.say('📦 Full!');
                         }
                     }
-                    creep.moveTo(target, { visualizePathStyle: { stroke: '#ffaa00' }, reusePath: 10 });
+                }
+                creep.moveTo(target, { visualizePathStyle: { stroke: '#ffaa00' }, reusePath: 10 });
                 }
             } else {
                 // IF NO TARGET FOUND: If we have ANY resources, go deliver them

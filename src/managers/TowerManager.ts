@@ -55,7 +55,7 @@ export class TowerManager {
         // Target Validation & "Search for others" logic
         if (target) {
             const isRoadCont = target.structureType === STRUCTURE_ROAD || target.structureType === STRUCTURE_CONTAINER;
-            
+
             // "if target is repaired above 50%, search for other roads or containers below 25%"
             if (isRoadCont && target.hits > target.hitsMax * 0.5) {
                 const hasCritical = room.find(FIND_STRUCTURES, {
@@ -66,7 +66,7 @@ export class TowerManager {
 
             // General completion check
             if (target && (
-                target.hits >= target.hitsMax || 
+                target.hits >= target.hitsMax ||
                 (target.structureType === STRUCTURE_WALL && target.hits >= wallMaxHits) ||
                 (target.structureType === STRUCTURE_RAMPART && target.hits >= rampartMaxHits)
             )) {
@@ -79,26 +79,26 @@ export class TowerManager {
             const allStructures = room.find(FIND_STRUCTURES);
 
             // A. Roads/Containers < 25% (Critical)
-            const critical = allStructures.filter(s => 
-                (s.structureType === STRUCTURE_ROAD || s.structureType === STRUCTURE_CONTAINER) && 
+            const critical = allStructures.filter(s =>
+                (s.structureType === STRUCTURE_ROAD || s.structureType === STRUCTURE_CONTAINER) &&
                 s.hits < s.hitsMax * 0.25
             );
             if (critical.length > 0) target = repairTowers[0].pos.findClosestByRange(critical);
 
             // B. Walls/Ramparts < 100 hits
             if (!target) {
-                const emergencyWalls = allStructures.filter(s => 
-                    (s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART) && 
+                const emergencyWalls = allStructures.filter(s =>
+                    (s.structureType === STRUCTURE_WALL || s.structureType === STRUCTURE_RAMPART) &&
                     s.hits < 100
                 );
                 if (emergencyWalls.length > 0) target = repairTowers[0].pos.findClosestByRange(emergencyWalls);
             }
 
-            // C. Roads/Containers < 90% (Maintenance)
+            // C. Roads/Containers < 80% (Maintenance)
             if (!target) {
-                const maintenance = allStructures.filter(s => 
-                    (s.structureType === STRUCTURE_ROAD || s.structureType === STRUCTURE_CONTAINER) && 
-                    s.hits < s.hitsMax * 0.9
+                const maintenance = allStructures.filter(s =>
+                    (s.structureType === STRUCTURE_ROAD || s.structureType === STRUCTURE_CONTAINER) &&
+                    s.hits < s.hitsMax * 0.8
                 );
                 if (maintenance.length > 0) target = repairTowers[0].pos.findClosestByRange(maintenance);
             }
