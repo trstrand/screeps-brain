@@ -176,6 +176,12 @@ export const roleRepairer: RoleHandler = {
                         else if (vacTomb) creep.withdraw(vacTomb, RESOURCE_ENERGY);
                     }
                     creep.moveTo(target, { visualizePathStyle: { stroke: '#ffaa00' }, reusePath: 10 });
+                } else if (action === OK) {
+                    if (creep.store.getUsedCapacity() >= creep.store.getCapacity() * 0.8) {
+                        creep.memory.working = true;
+                        delete creep.memory.targetId;
+                        creep.say('🔧 Repair');
+                    }
                 }
             }
         }

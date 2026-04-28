@@ -121,7 +121,8 @@ export const CREEP_CONFIGS: Record<string, RoleBodyConfig> = {
         sentinel: [TOUGH, TOUGH, MOVE, MOVE, MOVE, MOVE, ATTACK, HEAL],
         bastion: Array(4).fill(TOUGH).concat(Array(6).fill(MOVE)).concat(Array(4).fill(ATTACK)).concat([HEAL]),
         citadel: Array(6).fill(TOUGH).concat(Array(12).fill(MOVE)).concat(Array(5).fill(ATTACK)).concat([HEAL]),
-        apex: Array(10).fill(TOUGH).concat(Array(15).fill(MOVE)).concat(Array(8).fill(ATTACK)).concat([HEAL])
+        //apex: Array(10).fill(TOUGH).concat(Array(15).fill(MOVE)).concat(Array(8).fill(ATTACK)).concat([HEAL])
+        apex: Array(8).fill(ATTACK).concat(Array(8).fill(MOVE))
     },
     breaker: {
         vanguard: [ATTACK, ATTACK, MOVE, MOVE],

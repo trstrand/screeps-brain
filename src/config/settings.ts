@@ -4,7 +4,7 @@ export const COLONY_SETTINGS: ColonySettings = {
     breakerTarget: { room: 'E58S59', id: '66fea842535f3f45d9e35bc3' },
     defendRoom: 'E55S58',
     salvageRoom: '', // Leave empty to salvage in the home room, or set a target room string
-    remoteBuild: '',
+    remoteBuild: 'E59S57',
     claimRoom: '',
     ignoredSources: ['none'],
     //dismantle targets and wall/rampart attack settings
@@ -32,7 +32,7 @@ export const COLONY_SETTINGS: ColonySettings = {
         "E55S58": 1e4
     },
     remoteMining: {
-        'E59S58': [], // Example: 'HomeRoom': ['RemoteRoom1', 'RemoteRoom2']
+        'E58S57': ['E59S57'], // Example: 'HomeRoom': ['RemoteRoom1', 'RemoteRoom2']
     },
     mineralQuotas: {
         'E59S58': 10000,
@@ -52,7 +52,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             upgradeHauler: 0,
             upgrader: 1,
             builder: 0,
-            repairer: 0,
+            repairer: 1,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
@@ -137,8 +137,8 @@ export const COLONY_SETTINGS: ColonySettings = {
             dismantleMiner: 0,
             extractorMiner: 0,
             hauler: 1,
-            upgradeHauler: 0,
-            upgrader: 1,
+            upgradeHauler: 1,
+            upgrader: 3,
             builder: 0,
             repairer: 1,
             salvager: 0,

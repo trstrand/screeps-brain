@@ -209,12 +209,14 @@ export const roleUpgradeHauler: RoleHandler = {
                     // 4. Post-Interaction: If we have energy and nothing else is nearby, go deliver
                     if (creep.store[RESOURCE_ENERGY] > 0) {
                         const hasMoreEnergyNearby = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 5, {
-                            filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0
+                            filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 50
                         }).length > 0 || (
-                                'store' in target && target.store[RESOURCE_ENERGY] > 50
+                                'store' in target && target.store[RESOURCE_ENERGY] > 100
                             );
 
-                        if (!hasMoreEnergyNearby) {
+                        const isMostlyFull = creep.store.getUsedCapacity() >= creep.store.getCapacity() * 0.8;
+
+                        if (!hasMoreEnergyNearby || isMostlyFull) {
                             creep.memory.working = true;
                             delete creep.memory.targetId;
                             creep.say('📦 Deliver');

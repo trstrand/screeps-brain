@@ -241,7 +241,7 @@ export const roleHauler: RoleHandler = {
                 // Priority 1: Tombstones and dropped energy near Spawns
                 const nearbyDrops: any[] = [];
                 for (const spawn of mySpawns) {
-                    nearbyDrops.push(...allDrops.filter(r => r.resourceType === RESOURCE_ENERGY && r.amount > 0 && r.pos.inRangeTo(spawn, 3)));
+                    nearbyDrops.push(...allDrops.filter(r => r.resourceType === RESOURCE_ENERGY && r.amount >= 50 && r.pos.inRangeTo(spawn, 3)));
                     nearbyDrops.push(...allTombstones.filter(t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && t.creep.my && t.pos.inRangeTo(spawn, 3)));
                 }
                 if (nearbyDrops.length > 0) {
@@ -385,11 +385,16 @@ export const roleHauler: RoleHandler = {
                     }
                 }
             } else {
-                const parkTarget = creep.pos.findClosestByRange(FIND_MY_SPAWNS);
-                if (parkTarget && creep.pos.getRangeTo(parkTarget) > 5) {
-                    creep.moveTo(parkTarget, { range: 5, visualizePathStyle: { stroke: '#ffaa00' } });
+                if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    creep.memory.working = true;
+                    creep.say('📦 Deliver');
+                } else {
+                    const parkTarget = creep.pos.findClosestByRange(mySpawns);
+                    if (parkTarget && creep.pos.getRangeTo(parkTarget) > 5) {
+                        creep.moveTo(parkTarget, { range: 5, visualizePathStyle: { stroke: '#ffaa00' } });
+                    }
+                    creep.say('💤 Idle');
                 }
-                creep.say('💤 Idle');
             }
         }
     },
