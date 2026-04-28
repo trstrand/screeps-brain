@@ -36,12 +36,14 @@ export const roleHauler: RoleHandler = {
         if (creep.memory.working && creep.store.getUsedCapacity() === 0) {
             creep.memory.working = false;
             delete creep.memory.targetId;
+            delete creep.memory.deliveryTargetId;
             creep.say('🔄 Loading');
         }
 
         if (!creep.memory.working && creep.store.getFreeCapacity() === 0) {
             creep.memory.working = true;
             delete creep.memory.targetId;
+            delete creep.memory.deliveryTargetId;
             creep.say('📦 Deposit');
         }
 
@@ -135,7 +137,8 @@ export const roleHauler: RoleHandler = {
             // Cache heavy queries once per tick for the collection phase
             const allDrops = creep.room.find(FIND_DROPPED_RESOURCES);
             const allTombstones = creep.room.find(FIND_TOMBSTONES);
-            
+            const allContainers = creep.room.find(FIND_STRUCTURES, { filter: s => s.structureType === STRUCTURE_CONTAINER }) as StructureContainer[];
+
             const sourceIds = creep.room.memory.sourceIds || [];
             let activeSources = sourceIds.map(id => Game.getObjectById(id as Id<Source>)).filter(s => s !== null) as Source[];
             if (activeSources.length === 0) activeSources = creep.room.find(FIND_SOURCES);
@@ -150,6 +153,42 @@ export const roleHauler: RoleHandler = {
                 }
             }
 
+            if (!target) {
+                // PROXIMITY OVERRIDE: If partially full, grab the nearest valid target to fill up quickly
+                if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    const proximityTargets: any[] = [];
+                    const spawns = creep.room.find(FIND_MY_SPAWNS);
+                    
+                    for (const spawn of spawns) {
+                        proximityTargets.push(...allDrops.filter(r => r.resourceType === RESOURCE_ENERGY && r.amount > 0 && r.pos.inRangeTo(spawn, 3)));
+                        proximityTargets.push(...allTombstones.filter(t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && t.creep.my && t.pos.inRangeTo(spawn, 3)));
+                    }
+
+                    proximityTargets.push(...allDrops.filter(r => r.resourceType === RESOURCE_ENERGY && r.amount > 50 && isNearSource(r.pos)));
+                    proximityTargets.push(...allContainers.filter(s => s.store.getUsedCapacity(RESOURCE_ENERGY) > 150 && isNearSource(s.pos)));
+
+                    if (creep.room.memory.storageLink) {
+                        const storageLink = Game.getObjectById(creep.room.memory.storageLink as Id<StructureLink>);
+                        const hasSourceLink = !!creep.room.memory.sourceLink1 || !!creep.room.memory.sourceLink2;
+                        if (storageLink && hasSourceLink && storageLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                            proximityTargets.push(storageLink);
+                        }
+                    }
+
+                    if (creep.room.memory.dismantleMiningTarget) {
+                        const dismantleTarget = Game.getObjectById(creep.room.memory.dismantleMiningTarget as Id<Structure>);
+                        if (dismantleTarget) {
+                            proximityTargets.push(...allContainers.filter(s => s.store.getUsedCapacity(RESOURCE_ENERGY) >= 150 && s.pos.inRangeTo(dismantleTarget, 2)));
+                        }
+                    }
+
+                    if (proximityTargets.length > 0) {
+                        target = creep.pos.findClosestByRange(proximityTargets);
+                    }
+                }
+            }
+
+            // STRICT PRIORITIES: Used if empty, or if proximity override found nothing
             if (!target) {
                 // Priority 1: Tombstones and dropped energy near Spawns
                 const spawns = creep.room.find(FIND_MY_SPAWNS);
@@ -170,6 +209,14 @@ export const roleHauler: RoleHandler = {
                     }
                 }
 
+                // Priority 2.5: Containers near sources
+                if (!target) {
+                    const containers = allContainers.filter(s => s.store.getUsedCapacity(RESOURCE_ENERGY) > 150 && isNearSource(s.pos));
+                    if (containers.length > 0) {
+                        target = containers.sort((a, b) => b.store.getUsedCapacity(RESOURCE_ENERGY) - a.store.getUsedCapacity(RESOURCE_ENERGY))[0];
+                    }
+                }
+
                 // Priority 3: storageLink siphoning (Link -> Storage)
                 if (!target && creep.room.memory.storageLink) {
                     const storageLink = Game.getObjectById(creep.room.memory.storageLink as Id<StructureLink>);
@@ -180,23 +227,11 @@ export const roleHauler: RoleHandler = {
                     }
                 }
 
-                // Priority 4: Containers near sources
-                if (!target) {
-                    const containers = creep.room.find(FIND_STRUCTURES, {
-                        filter: s => s.structureType === STRUCTURE_CONTAINER && s.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && isNearSource(s.pos)
-                    }) as StructureContainer[];
-                    if (containers.length > 0) {
-                        target = containers.sort((a, b) => b.store.getUsedCapacity(RESOURCE_ENERGY) - a.store.getUsedCapacity(RESOURCE_ENERGY))[0];
-                    }
-                }
-
-                // Priority 4.5: Dismantle Mining Containers
+                // Priority 4: Dismantle Mining Containers
                 if (!target && creep.room.memory.dismantleMiningTarget) {
                     const dismantleTarget = Game.getObjectById(creep.room.memory.dismantleMiningTarget as Id<Structure>);
                     if (dismantleTarget) {
-                        const dismantleContainers = creep.room.find(FIND_STRUCTURES, {
-                            filter: s => s.structureType === STRUCTURE_CONTAINER && s.store.getUsedCapacity(RESOURCE_ENERGY) >= 150 && s.pos.inRangeTo(dismantleTarget, 2)
-                        }) as StructureContainer[];
+                        const dismantleContainers = allContainers.filter(s => s.store.getUsedCapacity(RESOURCE_ENERGY) >= 150 && s.pos.inRangeTo(dismantleTarget, 2));
                         if (dismantleContainers.length > 0) {
                             target = dismantleContainers.sort((a, b) => b.store.getUsedCapacity(RESOURCE_ENERGY) - a.store.getUsedCapacity(RESOURCE_ENERGY))[0];
                         }
@@ -216,7 +251,7 @@ export const roleHauler: RoleHandler = {
                     const storageLink = Game.getObjectById(creep.room.memory.storageLink as Id<StructureLink>);
                     const hasSourceLink = !!creep.room.memory.sourceLink1 || !!creep.room.memory.sourceLink2;
                     const linkNeedsEnergy = !hasSourceLink && creep.room.memory.controllerLink && storageLink && storageLink.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
-                    
+
                     if (linkNeedsEnergy) {
                         target = creep.room.storage;
                     }
