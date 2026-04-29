@@ -10,11 +10,18 @@ export const roleRemoteHauler: RoleHandler = {
             creep.say('🚚 Home');
         }
 
+        // 1.5 ANTI-BORDER BOUNCE: Move off exit tiles immediately
+        if (creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49) {
+            creep.moveTo(new RoomPosition(25, 25, creep.room.name), { visualizePathStyle: { stroke: '#ffaa00' } });
+            return;
+        }
+
         // 2. DELIVERY PHASE (Return to home room)
         if (creep.memory.working) {
             const homeRoom = creep.memory.homeRoom;
             if (homeRoom && creep.room.name !== homeRoom) {
                 creep.moveTo(new RoomPosition(25, 25, homeRoom), { visualizePathStyle: { stroke: '#ffffff' } });
+                return;
             } else {
                 const storage = creep.room.storage;
                 if (storage) {
@@ -40,6 +47,7 @@ export const roleRemoteHauler: RoleHandler = {
 
             if (creep.room.name !== targetRoom) {
                 creep.moveTo(new RoomPosition(25, 25, targetRoom), { range: 10, visualizePathStyle: { stroke: '#ffaa00' } });
+                return;
             } else {
                 // Priority 1: Pick up ANY dropped resources (prevent decay)
                 const dropped = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {

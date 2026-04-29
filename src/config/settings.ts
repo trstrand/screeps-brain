@@ -2,7 +2,7 @@ export const COLONY_SETTINGS: ColonySettings = {
     expeditionTargets: ['E59S55'],
     pioneerTarget: 'E57S56',
     breakerTarget: { room: 'E58S59', id: '66fea842535f3f45d9e35bc3' },
-    defendRoom: 'E55S58',
+    defendRoom: 'E57S56',
     salvageRoom: '', // Leave empty to salvage in the home room, or set a target room string
     remoteBuild: 'E59S57',
     claimRoom: 'E57S56',
@@ -155,13 +155,13 @@ export const COLONY_SETTINGS: ColonySettings = {
         },
         "E59S57": {
             remoteMiner: 1,
-            remoteHauler: 1,
+            remoteHauler: 0,
             remoteRepairer: 1
         },
         "E59S56": {
-            remoteMiner: 1,
-            remoteHauler: 1,
-            remoteRepairer: 1
+            remoteMiner: 0,
+            remoteHauler: 0,
+            remoteRepairer: 0
         }
     }
 };
