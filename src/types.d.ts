@@ -20,6 +20,7 @@ declare global {
         remoteMiner?: number;
         remoteHauler?: number;
         remoteExtractorMiner?: number;
+        remoteRepairer?: number;
         pioneer?: number;    
         expedition?: number;
         vanguard?: number;

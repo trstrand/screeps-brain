@@ -85,7 +85,7 @@ export const CREEP_CONFIGS: Record<string, RoleBodyConfig> = {
         sentinel: [WORK, WORK, WORK, WORK, CARRY, MOVE, MOVE],
         bastion: Array(6).fill(WORK).concat([CARRY]).concat(Array(4).fill(MOVE)),
         citadel: Array(8).fill(WORK).concat([CARRY]).concat(Array(6).fill(MOVE)),
-        apex: Array(8).fill(WORK).concat([CARRY]).concat(Array(6).fill(MOVE)),
+        apex: Array(5).fill(WORK).concat([CARRY]).concat(Array(5).fill(MOVE)),
         //apex: Array(10).fill(WORK).concat([CARRY]).concat(Array(8).fill(MOVE))
     },
     remoteHauler: {
@@ -137,6 +137,14 @@ export const CREEP_CONFIGS: Record<string, RoleBodyConfig> = {
         bastion: Array(4).fill(WORK).concat(Array(6).fill(CARRY)).concat(Array(6).fill(MOVE)),
         citadel: Array(6).fill(WORK).concat(Array(10).fill(CARRY)).concat(Array(8).fill(MOVE)),
         apex: Array(8).fill(WORK).concat(Array(10).fill(CARRY)).concat(Array(10).fill(MOVE))
+    },
+    remoteRepairer: {
+        vanguard: [WORK, CARRY, CARRY, MOVE, MOVE],
+        sentinel: Array(3).fill(WORK).concat(Array(2).fill(CARRY)).concat(Array(3).fill(MOVE)),
+        bastion: Array(4).fill(WORK).concat(Array(6).fill(CARRY)).concat(Array(6).fill(MOVE)),
+        citadel: Array(6).fill(WORK).concat(Array(10).fill(CARRY)).concat(Array(8).fill(MOVE)),
+        //apex: Array(8).fill(WORK).concat(Array(10).fill(CARRY)).concat(Array(10).fill(MOVE))
+        apex: Array(3).fill(WORK).concat(Array(3).fill(CARRY)).concat(Array(6).fill(MOVE)),
     },
     claimer: {
         vanguard: [CLAIM, MOVE]

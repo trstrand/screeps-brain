@@ -16,6 +16,7 @@ const SPAWN_PRIORITY: string[] = [
     'remoteMiner',
     'remoteHauler',
     'remoteExtractorMiner',
+    'remoteRepairer',
     'pioneer',
     'expedition',
     'vanguard',
@@ -84,7 +85,7 @@ export class SpawnManager {
 
         // 3. FILL QUOTAS: (Priority Order as requested)
         for (const role of SPAWN_PRIORITY) {
-            const isRemoteRole = role === 'remoteMiner' || role === 'remoteHauler' || role === 'remoteExtractorMiner';
+            const isRemoteRole = role === 'remoteMiner' || role === 'remoteHauler' || role === 'remoteExtractorMiner' || role === 'remoteRepairer';
 
             // --- EXPEDITION MULTI-TARGET LOGIC ---
             if (role === 'expedition') {
@@ -125,11 +126,21 @@ export class SpawnManager {
             }
 
             if (isRemoteRole) {
-                const remoteRooms = COLONY_SETTINGS.remoteMining[room.name] || [];
+                const isActualRemoteMiningRole = role === 'remoteMiner' || role === 'remoteHauler' || role === 'remoteExtractorMiner';
+                
+                // If it's a remote mining role, check remoteMining settings. 
+                // If it's a remote repairer, we might want to check remoteMining settings as well to see where we need roads repaired.
+                const remoteRooms = [...(COLONY_SETTINGS.remoteMining[room.name] || [])];
+                
+                // Also include the remoteBuild room if it exists and we are a remoteRepairer
+                if (role === 'remoteRepairer' && COLONY_SETTINGS.remoteBuild && !remoteRooms.includes(COLONY_SETTINGS.remoteBuild)) {
+                    remoteRooms.push(COLONY_SETTINGS.remoteBuild);
+                }
+
                 for (const remoteRoomName of remoteRooms) {
                     const remoteQuotas = COLONY_SETTINGS.roomQuotas[remoteRoomName] || {};
                     const targetCount = (remoteQuotas as any)[role] || 0;
-                    const roleCount = localCreeps.filter(c =>
+                    const roleCount = Object.values(Game.creeps).filter(c =>
                         c.memory.role === role &&
                         c.memory.targetRoom === remoteRoomName
                     ).length;
@@ -137,7 +148,10 @@ export class SpawnManager {
                     if (roleCount < targetCount) {
                         let memory: any = { ...baseMem, role, targetRoom: remoteRoomName };
                         if (role === 'remoteMiner') {
-                            const roomCreeps = localCreeps.filter(c => c.memory.targetRoom === remoteRoomName && c.memory.role === role);
+                            const roomCreeps = Object.values(Game.creeps).filter(c => 
+                                c.memory.targetRoom === remoteRoomName && 
+                                c.memory.role === role
+                            );
                             const assignedIndices = roomCreeps.map(c => c.memory.sourceIndex ?? -1);
                             memory.sourceIndex = [0, 1].find(i => !assignedIndices.includes(i)) ?? 0;
                         }

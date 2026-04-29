@@ -17,6 +17,7 @@ import { roleExpedition } from './expedition';
 import { roleVanguard } from './vanguard';
 import { roleBreaker } from './breaker';
 import { roleRemoteBuilder } from './remoteBuilder';
+import { roleRemoteRepairer } from './remoteRepairer';
 import { roleClaimer } from './claimer';
 
 export const RoleRegistry: Record<string, RoleHandler> = {
@@ -39,5 +40,6 @@ export const RoleRegistry: Record<string, RoleHandler> = {
     'vanguard': roleVanguard,
     'breaker': roleBreaker,
     'remoteBuilder': roleRemoteBuilder,
+    'remoteRepairer': roleRemoteRepairer,
     'claimer': roleClaimer
 };
