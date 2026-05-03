@@ -74,6 +74,7 @@ declare global {
         transferResource?: ResourceConstant;
         salvageContainers?: boolean;
         salvageEnergy?: boolean;
+        attackHealer?: boolean;
         tripStartTick?: number;
         fullTripTicks?: number;
         idleTicks?: number;

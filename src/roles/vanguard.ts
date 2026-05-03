@@ -21,17 +21,42 @@ export const roleVanguard: RoleHandler = {
         }
 
         // 2. SEARCH PHASE
+        const attackHealer = creep.memory.attackHealer ?? false;
         let target = Game.getObjectById(creep.memory.targetId as Id<Creep | Structure>);
 
-        // Validate target
-        if (!target || target.room?.name !== creep.room.name || (target instanceof Structure && target.hits === target.hitsMax)) {
+        // Validate target and check for re-targeting
+        let shouldReevaluate = !target || target.room?.name !== creep.room.name || (target instanceof Structure && target.hits === target.hitsMax);
+        
+        if (!shouldReevaluate && attackHealer && target instanceof Creep && target.getActiveBodyparts(HEAL) <= 1) {
+            const healers = creep.room.find(FIND_HOSTILE_CREEPS, { 
+                filter: h => h.getActiveBodyparts(HEAL) > 1 
+            });
+            if (healers.length > 0) shouldReevaluate = true;
+        }
+
+        if (shouldReevaluate) {
             delete creep.memory.targetId;
             target = null;
 
             // Priority 1: Hostile Creeps
             const hostiles = creep.room.find(FIND_HOSTILE_CREEPS);
             if (hostiles.length > 0) {
-                target = creep.pos.findClosestByRange(hostiles);
+                if (attackHealer) {
+                    const healers = hostiles.filter(h => h.getActiveBodyparts(HEAL) > 1);
+                    const armed = hostiles.filter(h => 
+                        h.getActiveBodyparts(ATTACK) > 0 || h.getActiveBodyparts(RANGED_ATTACK) > 0
+                    );
+
+                    if (healers.length > 0) {
+                        target = creep.pos.findClosestByRange(healers);
+                    } else if (armed.length > 0) {
+                        target = creep.pos.findClosestByRange(armed);
+                    } else {
+                        target = creep.pos.findClosestByRange(hostiles);
+                    }
+                } else {
+                    target = creep.pos.findClosestByRange(hostiles);
+                }
             } 
             
             // Priority 2: Invader Cores (Major threats in remote rooms)

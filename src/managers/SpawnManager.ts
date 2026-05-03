@@ -58,12 +58,18 @@ export class SpawnManager {
         // Emergency recovery uses available energy
         const bodyEnergy = (miners === 0 || haulers === 0) ? room.energyAvailable : energyCap;
 
-        // 1. TOP PRIORITY: Defender (if hostiles present)
-        const hostiles = room.find(FIND_HOSTILE_CREEPS);
+        // 1. TOP PRIORITY: Defender
+        const defenderQuota = (quotas as any)['defender'] || 0;
         const defenders = localRoleCounts['defender'] || 0;
-        if (hostiles.length > 0 && defenders === 0) {
+        const hostiles = room.find(FIND_HOSTILE_CREEPS);
+
+        // Spawn if quota isn't met OR if hostiles are present and we have no defender
+        if (defenders < defenderQuota || (hostiles.length > 0 && defenders === 0)) {
             const body = this.getBody('defender', bodyEnergy);
-            if (spawn.spawnCreep(body, `defender_${Game.time}`, { memory: { ...baseMem, role: 'defender' } }) === OK) return;
+            const result = spawn.spawnCreep(body, `defender_${Game.time}`, { memory: { ...baseMem, role: 'defender' } });
+            if (result === OK) return;
+            // If we are under quota or under attack, we wait for the energy to spawn the defender
+            if (result === ERR_NOT_ENOUGH_ENERGY) return; 
         }
 
         // 2. CRITICAL ROLES: First One (Priority Order: miner, hauler, upgrader)
