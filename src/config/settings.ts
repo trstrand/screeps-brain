@@ -1,6 +1,6 @@
 export const COLONY_SETTINGS: ColonySettings = {
     expeditionTargets: ['E59S55'],
-    pioneerTarget: 'E57S56',
+    pioneerTarget: 'E59S55',
     breakerTarget: { room: 'E58S59', id: '66fea842535f3f45d9e35bc3' },
     defendRoom: 'E57S56',
     salvageRoom: '', // Leave empty to salvage in the home room, or set a target room string
@@ -10,11 +10,12 @@ export const COLONY_SETTINGS: ColonySettings = {
     //dismantle targets and wall/rampart attack settings
     dismantleTargets: {
         "E58S58": '6654f475659b91ae40301a05',
+        "E59S55": "68f127fb02f4a7f03705c8f9",
         //rooms I want to break into to get to the controller
         "E58S59": '66fea842535f3f45d9e35bc3',
         "E59S59": '690d88dcd4824c61d123c725'
     },
-    attackWalls: false,
+    attackWalls: true,
     attackRamparts: false,
     //wall and rampart repair settings
     roomWallMaxHits: {
@@ -38,12 +39,12 @@ export const COLONY_SETTINGS: ColonySettings = {
         'E59S58': 10000,
     },
     resourceTransfers: [
-        // { sourceRoom: 'E59S58', destRoom: 'E58S58', resource: RESOURCE_ENERGY, count: 0 }
+        // { sourceRoom: 'E59S55', destRoom: 'E58S57', resource: RESOURCE_ENERGY }
+        // Options: RESOURCE_ENERGY, RESOURCE_POWER, RESOURCE_HYDROGEN, RESOURCE_OXYGEN, RESOURCE_UTRIUM, RESOURCE_LEMERGIUM, RESOURCE_KEANIUM, RESOURCE_ZYNTHIUM, RESOURCE_CATALYST, RESOURCE_GHODIUM
     ],
     debug: false,
-
     roomQuotas: {
-        'E59S58': {
+        "E59S58": {
             defender: 0,
             miner: 2,
             dismantleMiner: 0,
@@ -52,7 +53,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             upgradeHauler: 0,
             upgrader: 1,
             builder: 0,
-            repairer: 1,
+            repairer: 2,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
@@ -68,10 +69,10 @@ export const COLONY_SETTINGS: ColonySettings = {
         "E58S58": {
             defender: 0,
             miner: 2,
-            dismantleMiner: 1,
+            dismantleMiner: 0,
             extractorMiner: 0,
             hauler: 2,
-            upgradeHauler: 1,
+            upgradeHauler: 0,
             upgrader: 1,
             builder: 0,
             repairer: 1,
@@ -83,11 +84,11 @@ export const COLONY_SETTINGS: ColonySettings = {
             pioneer: 0,
             expedition: 0,
             vanguard: 0,
-            breaker: 0,
+            breaker: 1,
             remoteBuilder: 0,
             claimer: 0
         },
-        "E58S57": {   // main room
+        "E58S57": {
             defender: 0,
             miner: 2,
             dismantleMiner: 0,
@@ -96,7 +97,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             upgradeHauler: 0,
             upgrader: 1,
             builder: 0,
-            repairer: 0,
+            repairer: 1,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
@@ -137,6 +138,28 @@ export const COLONY_SETTINGS: ColonySettings = {
             dismantleMiner: 0,
             extractorMiner: 0,
             hauler: 1,
+            upgradeHauler: 0,
+            upgrader: 1,
+            builder: 0,
+            repairer: 0,
+            salvager: 0,
+            transferHauler: 0,
+            remoteMiner: 0,
+            remoteHauler: 0,
+            remoteExtractorMiner: 0,
+            pioneer: 0,
+            expedition: 0,
+            vanguard: 0,
+            breaker: 0,
+            remoteBuilder: 0,
+            claimer: 0
+        },
+        "E57S56": {
+            defender: 0,
+            miner: 2,
+            dismantleMiner: 0,
+            extractorMiner: 0,
+            hauler: 2,
             upgradeHauler: 1,
             upgrader: 1,
             builder: 0,
@@ -153,10 +176,54 @@ export const COLONY_SETTINGS: ColonySettings = {
             remoteBuilder: 0,
             claimer: 0
         },
-        "E59S57": {
-            remoteMiner: 1,
+        "E58S56": {
+            defender: 0,
+            miner: 2,
+            dismantleMiner: 0,
+            extractorMiner: 0,
+            hauler: 2,
+            upgradeHauler: 2,
+            upgrader: 3,
+            builder: 0,
+            repairer: 2,
+            salvager: 0,
+            transferHauler: 0,
+            remoteMiner: 0,
             remoteHauler: 0,
-            remoteRepairer: 1
+            remoteExtractorMiner: 0,
+            pioneer: 0,
+            expedition: 0,
+            vanguard: 0,
+            breaker: 0,
+            remoteBuilder: 0,
+            claimer: 0
+        },
+        "E59S55": {
+            defender: 0,
+            miner: 2,
+            dismantleMiner: 0,
+            extractorMiner: 0,
+            hauler: 1,
+            upgradeHauler: 2,
+            upgrader: 2,
+            builder: 2,
+            repairer: 1,
+            salvager: 0,
+            transferHauler: 0,
+            remoteMiner: 0,
+            remoteHauler: 0,
+            remoteExtractorMiner: 0,
+            pioneer: 0,
+            expedition: 0,
+            vanguard: 0,
+            breaker: 0,
+            remoteBuilder: 0,
+            claimer: 0
+        },
+        "E59S57": {
+            remoteMiner: 0,
+            remoteHauler: 0,
+            remoteRepairer: 0
         },
         "E59S56": {
             remoteMiner: 0,

@@ -33,7 +33,6 @@ declare global {
         sourceRoom: string;
         destRoom: string;
         resource: ResourceConstant;
-        count: number;
     }
 
     interface ColonySettings {
@@ -73,6 +72,10 @@ declare global {
         sourceRoom?: string;
         destinationRoom?: string;
         transferResource?: ResourceConstant;
+        salvageContainers?: boolean;
+        salvageEnergy?: boolean;
+        tripStartTick?: number;
+        fullTripTicks?: number;
         idleTicks?: number;
         dismantleExtensions?: boolean;
     }

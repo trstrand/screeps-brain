@@ -353,12 +353,23 @@ export const roleHauler: RoleHandler = {
                     // Local area clear logic - using cached arrays for efficiency
                     const localDropped = creep.pos.findInRange(allDrops, 1, { filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0 })[0];
                     const localTombstone = creep.pos.findInRange(allTombstones, 1, { filter: (t: Tombstone) => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
+                    const localContainer = creep.pos.findInRange(allContainers, 1, { filter: (s: StructureContainer) => s.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
 
                     let actionResult: number = ERR_NOT_IN_RANGE;
-                    if (localDropped) {
+
+                    // PRIORITY: 
+                    // 1. Large drops (prevent decay/loss)
+                    // 2. Tombstones (urgent)
+                    // 3. Substantial containers (fill up fast)
+                    // 4. Any remaining drops
+                    if (localDropped && localDropped.amount > 100) {
                         actionResult = creep.pickup(localDropped);
                     } else if (localTombstone) {
                         actionResult = creep.withdraw(localTombstone, RESOURCE_ENERGY);
+                    } else if (localContainer && localContainer.store.getUsedCapacity(RESOURCE_ENERGY) > 100) {
+                        actionResult = creep.withdraw(localContainer, RESOURCE_ENERGY);
+                    } else if (localDropped) {
+                        actionResult = creep.pickup(localDropped);
                     } else if ('store' in target) {
                         actionResult = creep.withdraw(target, RESOURCE_ENERGY);
                     } else if ('amount' in target) {
@@ -392,8 +403,11 @@ export const roleHauler: RoleHandler = {
                 }
             } else {
                 const isMostlyFull = creep.store.getUsedCapacity(RESOURCE_ENERGY) >= creep.store.getCapacity() * 0.8;
+                const hasMinEnergy = creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 50;
+
                 if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                    if (isMostlyFull || !this.shuttleCheck(creep.room)) {
+                    // Only deliver if mostly full, or if we have at least 50 energy and the room is in critical need
+                    if (isMostlyFull || (hasMinEnergy && !this.shuttleCheck(creep.room))) {
                         creep.memory.working = true;
                         creep.say('📦 Deliver');
                     } else {
@@ -402,13 +416,8 @@ export const roleHauler: RoleHandler = {
                             creep.moveTo(parkTarget, { range: 5, visualizePathStyle: { stroke: '#ffaa00' } });
                         }
                         creep.say('💤 Idle');
+                        creep.say('⌛ Waiting');
                     }
-                } else {
-                    const parkTarget = creep.pos.findClosestByRange(mySpawns);
-                    if (parkTarget && creep.pos.getRangeTo(parkTarget) > 5) {
-                        creep.moveTo(parkTarget, { range: 5, visualizePathStyle: { stroke: '#ffaa00' } });
-                    }
-                    creep.say('💤 Idle');
                 }
             }
         }

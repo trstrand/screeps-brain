@@ -114,13 +114,19 @@ export const rolePioneer: RoleHandler = {
 
             // --- PRIORITY 2: DROPPED ENERGY / LOOT ---
             if (!target) {
-                target = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
+                const dropped = creep.room.find(FIND_DROPPED_RESOURCES, {
                     filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 50
-                }) || creep.pos.findClosestByRange(FIND_TOMBSTONES, {
+                });
+                const tombstones = creep.room.find(FIND_TOMBSTONES, {
                     filter: t => t.store[RESOURCE_ENERGY] > 0
-                }) || creep.pos.findClosestByRange(FIND_RUINS, {
+                });
+                const ruins = creep.room.find(FIND_RUINS, {
                     filter: r => r.store.getUsedCapacity(RESOURCE_ENERGY) > 0
                 });
+
+                const allLoot = [...dropped, ...tombstones, ...ruins];
+                target = creep.pos.findClosestByRange(allLoot);
+                
                 if (target) creep.memory.targetId = target.id;
             }
 
@@ -146,8 +152,8 @@ export const rolePioneer: RoleHandler = {
         // --- EXECUTION ---
         if (target) {
             let result;
-            if ('structureType' in target) {
-                // It's a structure (Container/Storage/Dismantle target)
+            if ('hits' in target && 'structureType' in target) {
+                // It's a REAL structure (Container/Storage/Dismantle target)
                 if (target.structureType === STRUCTURE_CONTAINER || target.structureType === STRUCTURE_STORAGE) {
                     result = creep.withdraw(target, RESOURCE_ENERGY);
                 } else if (target.structureType === STRUCTURE_SPAWN && (target as any).my) {
@@ -164,7 +170,7 @@ export const rolePioneer: RoleHandler = {
                 // It's a source
                 result = creep.harvest(target);
             } else if ('store' in target) {
-                // Tombstone or Ruin
+                // Tombstone or Ruin (no 'hits' property)
                 result = creep.withdraw(target, RESOURCE_ENERGY);
             }
 

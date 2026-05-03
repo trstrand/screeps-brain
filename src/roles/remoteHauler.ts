@@ -77,7 +77,13 @@ export const roleRemoteHauler: RoleHandler = {
                         }
                     }
                 } else {
-                    creep.say('⌛ Waiting');
+                    // If we have ANY energy and there's nothing left to pick up, go home
+                    if (creep.store.getUsedCapacity() > 0) {
+                        creep.memory.working = true;
+                        creep.say('🚚 Home (Part)');
+                    } else {
+                        creep.say('⌛ Waiting');
+                    }
                 }
             }
         }

@@ -136,14 +136,18 @@ export const roleRepairer: RoleHandler = {
             }
 
             if (!target) {
-                // Priority 1: Loot (Tombstones, Ruins, Dropped)
-                const loot = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
+                // Priority 1: Loot (Tombstones, Ruins, Dropped) - Combined for closest
+                const dropped = creep.room.find(FIND_DROPPED_RESOURCES, {
                     filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 20
-                }) || creep.pos.findClosestByRange(FIND_TOMBSTONES, {
+                });
+                const tombstones = creep.room.find(FIND_TOMBSTONES, {
                     filter: t => t.store[RESOURCE_ENERGY] > 0
-                }) || creep.pos.findClosestByRange(FIND_RUINS, {
+                });
+                const ruins = creep.room.find(FIND_RUINS, {
                     filter: r => r.store[RESOURCE_ENERGY] > 0
                 });
+
+                const loot = creep.pos.findClosestByRange([...dropped, ...tombstones, ...ruins]);
 
                 if (loot) {
                     target = loot;
