@@ -152,17 +152,31 @@ export const roleRepairer: RoleHandler = {
                 if (loot) {
                     target = loot;
                 } else {
-                    // Priority 2: Structured Energy (Containers/Storage)
-                    const energySource = creep.pos.findClosestByRange(FIND_STRUCTURES, {
-                        filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_STORAGE) &&
-                            s.store.getUsedCapacity(RESOURCE_ENERGY) > 25
-                    });
+                    // Priority 2: Hostile Structures (Terminal then Storage)
+                    const hostileTerminal = creep.room.find(FIND_HOSTILE_STRUCTURES, {
+                        filter: (s) => s.structureType === STRUCTURE_TERMINAL && s.store[RESOURCE_ENERGY] > 0
+                    })[0];
+                    const hostileStorage = !hostileTerminal ? creep.room.find(FIND_HOSTILE_STRUCTURES, {
+                        filter: (s) => s.structureType === STRUCTURE_STORAGE && s.store[RESOURCE_ENERGY] > 0
+                    })[0] : null;
 
-                    if (energySource) {
-                        target = energySource;
+                    if (hostileTerminal) {
+                        target = hostileTerminal;
+                    } else if (hostileStorage) {
+                        target = hostileStorage;
                     } else {
-                        // Priority 3: Last Resort (Harvest)
-                        target = creep.pos.findClosestByRange(FIND_SOURCES_ACTIVE);
+                        // Priority 3: Structured Energy (Containers/Storage)
+                        const energySource = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+                            filter: (s) => (s.structureType === STRUCTURE_CONTAINER || (s.structureType === STRUCTURE_STORAGE && (s as StructureStorage).my)) &&
+                                s.store.getUsedCapacity(RESOURCE_ENERGY) > 25
+                        });
+
+                        if (energySource) {
+                            target = energySource;
+                        } else {
+                            // Priority 4: Last Resort (Harvest)
+                            target = creep.pos.findClosestByRange(FIND_SOURCES_ACTIVE);
+                        }
                     }
                 }
 

@@ -3,7 +3,7 @@ export const COLONY_SETTINGS: ColonySettings = {
     pioneerTarget: 'E59S55',
     breakerTarget: { room: 'E58S59', id: '66fea842535f3f45d9e35bc3' },
     defendRoom: 'E57S56',
-    salvageRoom: '', // Leave empty to salvage in the home room, or set a target room string
+    salvageRoom: 'E59S55', // Leave empty to salvage in the home room, or set a target room string
     remoteBuild: 'E59S57',
     claimRoom: 'E57S56',
     ignoredSources: ['none'],

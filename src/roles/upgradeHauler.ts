@@ -144,35 +144,48 @@ export const roleUpgradeHauler: RoleHandler = {
 
                 // Priority B: Energy (Only if not already carrying minerals)
                 if (!target && !hasMinerals) {
-                    const energySources = [
-                        ...creep.room.find(FIND_DROPPED_RESOURCES, {
-                            filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 50
-                        }),
-                        ...creep.room.find(FIND_TOMBSTONES, {
-                            filter: (t: Tombstone) => t.store[RESOURCE_ENERGY] > 50
-                        }),
-                        ...creep.room.find(FIND_RUINS, {
-                            filter: (r: Ruin) => r.store[RESOURCE_ENERGY] > 50
-                        }),
-                        ...creep.room.find(FIND_STRUCTURES, {
-                            filter: (s) => {
-                                // Storage is always a valid source if it has energy
-                                if (s.structureType === STRUCTURE_STORAGE) {
-                                    return s.store[RESOURCE_ENERGY] > 0;
-                                }
-                                // Containers are valid if they have energy and AREN'T the controller container
-                                if (s.structureType === STRUCTURE_CONTAINER) {
-                                    const isControllerContainer = creep.room.controller && s.pos.inRangeTo(creep.room.controller, 1);
-                                    const isSourceContainer = s.pos.findInRange(FIND_SOURCES, 2).length > 0;
+                    // 1. Hostile Terminals (Priority 1)
+                    const hostileTerminal = creep.room.find(FIND_HOSTILE_STRUCTURES, {
+                        filter: (s) => s.structureType === STRUCTURE_TERMINAL && s.store[RESOURCE_ENERGY] > 0
+                    })[0];
 
-                                    return s.store[RESOURCE_ENERGY] > 100 && (isSourceContainer || !isControllerContainer);
-                                }
-                                return false;
-                            }
-                        }) as (StructureStorage | StructureContainer)[]
-                    ];
+                    // 2. Hostile Storage (Priority 2)
+                    const hostileStorage = !hostileTerminal ? creep.room.find(FIND_HOSTILE_STRUCTURES, {
+                        filter: (s) => s.structureType === STRUCTURE_STORAGE && s.store[RESOURCE_ENERGY] > 0
+                    })[0] : null;
 
-                    target = creep.pos.findClosestByRange(energySources);
+                    if (hostileTerminal) {
+                        target = hostileTerminal;
+                    } else if (hostileStorage) {
+                        target = hostileStorage;
+                    } else {
+                        // 3. Local Sources, Loot, and My Structures
+                        const energySources = [
+                            ...creep.room.find(FIND_DROPPED_RESOURCES, {
+                                filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 50
+                            }),
+                            ...creep.room.find(FIND_TOMBSTONES, {
+                                filter: (t: Tombstone) => t.store[RESOURCE_ENERGY] > 50
+                            }),
+                            ...creep.room.find(FIND_RUINS, {
+                                filter: (r: Ruin) => r.store[RESOURCE_ENERGY] > 50
+                            }),
+                            ...creep.room.find(FIND_STRUCTURES, {
+                                filter: (s) => {
+                                    if (s.structureType === STRUCTURE_STORAGE && (s as StructureStorage).my) {
+                                        return s.store[RESOURCE_ENERGY] > 0;
+                                    }
+                                    if (s.structureType === STRUCTURE_CONTAINER) {
+                                        const isControllerContainer = creep.room.controller && s.pos.inRangeTo(creep.room.controller, 1);
+                                        const isSourceContainer = s.pos.findInRange(FIND_SOURCES, 2).length > 0;
+                                        return s.store[RESOURCE_ENERGY] > 100 && (isSourceContainer || !isControllerContainer);
+                                    }
+                                    return false;
+                                }
+                            }) as (StructureStorage | StructureContainer)[]
+                        ];
+                        target = creep.pos.findClosestByRange(energySources);
+                    }
                 }
 
                 if (target) {

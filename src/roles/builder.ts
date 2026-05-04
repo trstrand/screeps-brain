@@ -130,17 +130,33 @@ export const roleBuilder: RoleHandler = {
 
                 // Priority 2: Structures & Loot (Path-aware) - Global search
                 if (!target) {
-                    const candidates: (StructureContainer | StructureStorage | Tombstone | Resource | Ruin)[] = [
-                        ...creep.room.find(FIND_STRUCTURES, {
-                            filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_STORAGE) &&
-                                s.store.getUsedCapacity(RESOURCE_ENERGY) > 100
-                        }) as (StructureContainer | StructureStorage)[],
-                        ...creep.room.find(FIND_RUINS, { filter: r => r.store.getUsedCapacity(RESOURCE_ENERGY) > 0 }),
-                        ...creep.room.find(FIND_TOMBSTONES, { filter: t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 }),
-                        ...creep.room.find(FIND_DROPPED_RESOURCES, { filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 25 })
-                    ];
+                    // 1. Hostile Terminals (Priority 1)
+                    const hostileTerminal = creep.room.find(FIND_HOSTILE_STRUCTURES, {
+                        filter: (s) => s.structureType === STRUCTURE_TERMINAL && s.store[RESOURCE_ENERGY] > 0
+                    })[0];
 
-                    target = creep.pos.findClosestByRange(candidates);
+                    // 2. Hostile Storage (Priority 2)
+                    const hostileStorage = !hostileTerminal ? creep.room.find(FIND_HOSTILE_STRUCTURES, {
+                        filter: (s) => s.structureType === STRUCTURE_STORAGE && s.store[RESOURCE_ENERGY] > 0
+                    })[0] : null;
+
+                    if (hostileTerminal) {
+                        target = hostileTerminal;
+                    } else if (hostileStorage) {
+                        target = hostileStorage;
+                    } else {
+                        const candidates: (StructureContainer | StructureStorage | Tombstone | Resource | Ruin)[] = [
+                            ...creep.room.find(FIND_STRUCTURES, {
+                                filter: (s) => (s.structureType === STRUCTURE_CONTAINER || (s.structureType === STRUCTURE_STORAGE && (s as StructureStorage).my)) &&
+                                    s.store.getUsedCapacity(RESOURCE_ENERGY) > 100
+                            }) as (StructureContainer | StructureStorage)[],
+                            ...creep.room.find(FIND_RUINS, { filter: r => r.store.getUsedCapacity(RESOURCE_ENERGY) > 0 }),
+                            ...creep.room.find(FIND_TOMBSTONES, { filter: t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 }),
+                            ...creep.room.find(FIND_DROPPED_RESOURCES, { filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 25 })
+                        ];
+
+                        target = creep.pos.findClosestByRange(candidates);
+                    }
                     if (target) {
                         creep.memory.targetId = target.id;
                     }

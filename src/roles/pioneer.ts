@@ -15,10 +15,22 @@ export const rolePioneer: RoleHandler = {
         }
 
         // --- 0. BORDER SAFETY ---
+        // If we are on an edge, we need to move into the room to avoid bouncing
         if (creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49) {
-            creep.moveTo(new RoomPosition(25, 25, creep.room.name));
-            creep.say('🚧 Edge Fix');
-            return;
+            const xDir = creep.pos.x === 0 ? 1 : (creep.pos.x === 49 ? -1 : 0);
+            const yDir = creep.pos.y === 0 ? 1 : (creep.pos.y === 49 ? -1 : 0);
+            creep.move(
+                (xDir === 1 && yDir === 1) ? BOTTOM_RIGHT :
+                (xDir === 1 && yDir === -1) ? TOP_RIGHT :
+                (xDir === -1 && yDir === 1) ? BOTTOM_LEFT :
+                (xDir === -1 && yDir === -1) ? TOP_LEFT :
+                (xDir === 1) ? RIGHT :
+                (xDir === -1) ? LEFT :
+                (yDir === 1) ? BOTTOM : TOP
+            );
+            creep.say('🚧 Step In');
+            // We don't return here anymore; we allow the rest of the logic to run
+            // but we've already issued a move command to get off the edge.
         }
 
         // --- 1. STATE MACHINE ---
@@ -48,8 +60,9 @@ export const rolePioneer: RoleHandler = {
         if (creep.memory.working) {
             if (creep.room.name !== targetRoom) {
                 creep.moveTo(new RoomPosition(25, 25, targetRoom), { 
-                    visualizePathStyle: { stroke: '#ffffff' },
-                    reusePath: 50 
+                    visualizePathStyle: { stroke: '#ffffff', lineStyle: 'dashed' },
+                    reusePath: 50,
+                    maxRooms: 10 // Allow long-distance pathing
                 });
                 creep.say('🛰️ Traveling');
                 return; 
@@ -70,7 +83,10 @@ export const rolePioneer: RoleHandler = {
         // unless we found energy in the current room.
         if (creep.room.name !== homeRoom && creep.room.name !== targetRoom) {
             // Priority: Get to HomeRoom to refill if we are empty and in transit
-            creep.moveTo(new RoomPosition(25, 25, homeRoom!), { visualizePathStyle: { stroke: '#ffaa00' } });
+            creep.moveTo(new RoomPosition(25, 25, homeRoom!), { 
+                visualizePathStyle: { stroke: '#ffaa00', lineStyle: 'dotted' },
+                reusePath: 50
+            });
             creep.say('🛰️ To Home');
             return;
         }
