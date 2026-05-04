@@ -226,7 +226,11 @@ export class SpawnManager {
                     } else continue;
                 }
                 if (role === 'vanguard') memory.targetRoom = COLONY_SETTINGS.defendRoom;
-                if (role === 'salvager' && COLONY_SETTINGS.salvageRoom) memory.targetRoom = COLONY_SETTINGS.salvageRoom;
+                if (role === 'salvager') {
+                    if (COLONY_SETTINGS.salvageRoom) memory.targetRoom = COLONY_SETTINGS.salvageRoom;
+                    memory.salvageContainers = COLONY_SETTINGS.salvageContainers;
+                    memory.salvageEnergy = COLONY_SETTINGS.salvageEnergy;
+                }
                 if (role === 'remoteBuilder' && COLONY_SETTINGS.remoteBuild) memory.targetRoom = COLONY_SETTINGS.remoteBuild;
                 if (role === 'claimer' && COLONY_SETTINGS.claimRoom) memory.targetRoom = COLONY_SETTINGS.claimRoom;
 

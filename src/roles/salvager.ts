@@ -61,13 +61,20 @@ export const roleSalvager: RoleHandler = {
                 // 1. Dropped Resources, Tombstones, Ruins
                 target = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
                     filter: (r: Resource) => {
+                        if (!salvageEnergy && r.resourceType === RESOURCE_ENERGY) return false;
                         const isNearSource = r.pos.findInRange(FIND_SOURCES, 2).length > 0;
                         return isNearSource ? r.amount > 400 : r.amount > 50;
                     }
                 }) || creep.pos.findClosestByRange(FIND_TOMBSTONES, { 
-                    filter: (t: Tombstone) => t.store.getUsedCapacity() > 100 
+                    filter: (t: Tombstone) => {
+                        if (!salvageEnergy && t.store.getUsedCapacity() === t.store.getUsedCapacity(RESOURCE_ENERGY)) return false;
+                        return t.store.getUsedCapacity() > 100;
+                    }
                 }) || creep.pos.findClosestByRange(FIND_RUINS, { 
-                    filter: (r: Ruin) => r.store.getUsedCapacity() > 100 
+                    filter: (r: Ruin) => {
+                        if (!salvageEnergy && r.store.getUsedCapacity() === r.store.getUsedCapacity(RESOURCE_ENERGY)) return false;
+                        return r.store.getUsedCapacity() > 100;
+                    }
                 });
 
                 // 2. Containers (if enabled)

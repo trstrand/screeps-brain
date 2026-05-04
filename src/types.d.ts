@@ -41,6 +41,8 @@ declare global {
         breakerTarget: { room: string, id: string };
         defendRoom: string;
         salvageRoom?: string;
+        salvageContainers: boolean;
+        salvageEnergy: boolean;
         remoteBuild?: string;
         claimRoom?: string;
         roomWallMaxHits?: { [roomName: string]: number };
