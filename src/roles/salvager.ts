@@ -32,6 +32,7 @@ export const roleSalvager: RoleHandler = {
 
         const salvageContainers = creep.memory.salvageContainers ?? false;
         const salvageEnergy = creep.memory.salvageEnergy ?? false;
+        const depositHome = creep.memory.depositHome ?? false;
 
         // 2. SALVAGE PHASE
         if (creep.memory.working) {
@@ -175,7 +176,15 @@ export const roleSalvager: RoleHandler = {
 
         // 3. DEPOSIT PHASE
         else {
-            // First, try to find a storage in the CURRENT room that belongs to me
+            const homeRoom = creep.memory.homeRoom;
+
+            // If depositHome is true and we aren't home, move home first
+            if (depositHome && homeRoom && creep.room.name !== homeRoom) {
+                creep.moveTo(new RoomPosition(25, 25, homeRoom), { range: 10, visualizePathStyle: { stroke: '#ffffff' } });
+                return;
+            }
+
+            // Try to find a storage in the CURRENT room that belongs to me
             const currentStorage = creep.room.storage;
 
             if (currentStorage && currentStorage.my) {
@@ -190,7 +199,6 @@ export const roleSalvager: RoleHandler = {
                 }
             } else {
                 // No storage in this room, head back to Home Room
-                const homeRoom = creep.memory.homeRoom;
                 if (homeRoom && creep.room.name !== homeRoom) {
                     creep.moveTo(new RoomPosition(25, 25, homeRoom), { range: 10, visualizePathStyle: { stroke: '#ffffff' } });
                 } else {

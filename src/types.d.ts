@@ -43,6 +43,7 @@ declare global {
         salvageRoom?: string;
         salvageContainers: boolean;
         salvageEnergy: boolean;
+        depositHome: boolean;
         remoteBuild?: string;
         claimRoom?: string;
         roomWallMaxHits?: { [roomName: string]: number };
@@ -76,6 +77,7 @@ declare global {
         transferResource?: ResourceConstant;
         salvageContainers?: boolean;
         salvageEnergy?: boolean;
+        depositHome?: boolean;
         attackHealer?: boolean;
         tripStartTick?: number;
         fullTripTicks?: number;
