@@ -218,7 +218,17 @@ export class SpawnManager {
 
                 if (role === 'transferHauler') {
                     const transfers = COLONY_SETTINGS.resourceTransfers || [];
-                    const transfer = transfers.find(t => t.sourceRoom === room.name);
+                    const allTransferHaulers = Object.values(Game.creeps).filter(c => c.memory.role === 'transferHauler');
+
+                    const transfer = transfers.find(t => {
+                        const countForThisTransfer = allTransferHaulers.filter(c => 
+                            c.memory.sourceRoom === t.sourceRoom && 
+                            c.memory.destinationRoom === t.destRoom && 
+                            c.memory.transferResource === t.resource
+                        ).length;
+                        return countForThisTransfer < (t.count || 1);
+                    });
+
                     if (transfer) {
                         memory.sourceRoom = transfer.sourceRoom;
                         memory.destinationRoom = transfer.destRoom;

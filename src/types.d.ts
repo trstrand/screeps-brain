@@ -33,6 +33,7 @@ declare global {
         sourceRoom: string;
         destRoom: string;
         resource: ResourceConstant;
+        count?: number;
     }
 
     interface ColonySettings {

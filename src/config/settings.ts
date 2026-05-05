@@ -36,14 +36,14 @@ export const COLONY_SETTINGS: ColonySettings = {
         "E55S58": 1e4
     },
     remoteMining: {
-        'E58S57': ['E59S57', 'E59S56'], // Example: 'HomeRoom': ['RemoteRoom1', 'RemoteRoom2']
+        'E58S57': ['E58S56', 'E5S56'], // Example: 'HomeRoom': ['RemoteRoom1', 'RemoteRoom2']
     },
     mineralQuotas: {
         'E59S58': 10000,
     },
     resourceTransfers: [
-        // { sourceRoom: 'E59S55', destRoom: 'E58S57', resource: RESOURCE_ENERGY }
-        // Options: RESOURCE_ENERGY, RESOURCE_POWER, RESOURCE_HYDROGEN, RESOURCE_OXYGEN, RESOURCE_UTRIUM, RESOURCE_LEMERGIUM, RESOURCE_KEANIUM, RESOURCE_ZYNTHIUM, RESOURCE_CATALYST, RESOURCE_GHODIUM
+        { sourceRoom: 'E59S55', destRoom: 'E58S57', resource: RESOURCE_POWER, count: 2 }
+        // Options: RESOURCE_ENERGY, RESOURCE_POWER, RESOURCE_POWER, RESOURCE_HYDROGEN, RESOURCE_OXYGEN, RESOURCE_UTRIUM, RESOURCE_LEMERGIUM, RESOURCE_KEANIUM, RESOURCE_ZYNTHIUM, RESOURCE_CATALYST, RESOURCE_GHODIUM
     ],
     debug: false,
     roomQuotas: {
