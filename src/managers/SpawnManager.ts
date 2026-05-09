@@ -45,7 +45,8 @@ export class SpawnManager {
         const baseMem = { homeRoom: room.name, working: false, recycle: false };
         const quotas = COLONY_SETTINGS.roomQuotas[room.name] || {};
 
-        const localCreeps = Object.values(Game.creeps).filter(c => c.memory.homeRoom === room.name);
+        const allCreeps = Object.values(Game.creeps);
+        const localCreeps = allCreeps.filter(c => c.memory.homeRoom === room.name);
 
         // OPTIMIZATION: Group local creeps by role once per tick instead of filtering in loops
         const localRoleCounts: Record<string, number> = {};
@@ -110,7 +111,7 @@ export class SpawnManager {
                     const cooldown = 900;
                     const canSpawn = (Game.time - lastSpawn) >= cooldown;
 
-                    const existing = Object.values(Game.creeps).find(c =>
+                    const existing = allCreeps.find(c =>
                         c.memory.role === 'expedition' && c.memory.targetRoom === targetRoomName
                     );
 
@@ -147,7 +148,7 @@ export class SpawnManager {
                 for (const remoteRoomName of remoteRooms) {
                     const remoteQuotas = COLONY_SETTINGS.roomQuotas[remoteRoomName] || {};
                     const targetCount = (remoteQuotas as any)[role] || 0;
-                    const roleCount = Object.values(Game.creeps).filter(c =>
+                    const roleCount = allCreeps.filter(c =>
                         c.memory.role === role &&
                         c.memory.targetRoom === remoteRoomName
                     ).length;
@@ -155,7 +156,7 @@ export class SpawnManager {
                     if (roleCount < targetCount) {
                         let memory: any = { ...baseMem, role, targetRoom: remoteRoomName };
                         if (role === 'remoteMiner') {
-                            const roomCreeps = Object.values(Game.creeps).filter(c => 
+                            const roomCreeps = allCreeps.filter(c => 
                                 c.memory.targetRoom === remoteRoomName && 
                                 c.memory.role === role
                             );
@@ -194,6 +195,26 @@ export class SpawnManager {
                     if (currentStock >= quota) targetCount = 0;
                 }
             }
+            if (role === 'marketHauler' && targetCount > 0) {
+                const hasExtractor = room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTRACTOR } }).length > 0;
+                const mineral = room.find(FIND_MINERALS)[0];
+                const quota = COLONY_SETTINGS.mineralQuotas[room.name];
+                let needsMinerals = false;
+                if (hasExtractor && mineral && quota !== undefined && room.storage) {
+                    const currentStock = room.storage.store.getUsedCapacity(mineral.mineralType);
+                    if (currentStock < quota) needsMinerals = true;
+                }
+
+                const transfers = (COLONY_SETTINGS.terminalTransfers && COLONY_SETTINGS.terminalTransfers[room.name]) || [];
+                const terminal = room.terminal;
+                const storage = room.storage;
+                let hasPendingTransfers = false;
+                if (terminal && storage && transfers.length > 0) {
+                    hasPendingTransfers = transfers.some(t => (terminal.store[t.resource] || 0) < t.amount && (storage.store[t.resource] || 0) > 0);
+                }
+
+                if (!needsMinerals && !hasPendingTransfers) targetCount = 0;
+            }
 
             if (roleCount < targetCount) {
                 let memory: any = { ...baseMem, role };
@@ -219,7 +240,7 @@ export class SpawnManager {
 
                 if (role === 'transferHauler') {
                     const transfers = COLONY_SETTINGS.resourceTransfers || [];
-                    const allTransferHaulers = Object.values(Game.creeps).filter(c => c.memory.role === 'transferHauler');
+                    const allTransferHaulers = allCreeps.filter(c => c.memory.role === 'transferHauler');
 
                     const transfer = transfers.find(t => {
                         const countForThisTransfer = allTransferHaulers.filter(c => 

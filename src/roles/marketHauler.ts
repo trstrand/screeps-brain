@@ -40,12 +40,12 @@ export const roleMarketHauler: RoleHandler = {
             const terminal = creep.room.terminal;
             const storage = creep.room.storage;
             const transfers = (COLONY_SETTINGS.terminalTransfers && COLONY_SETTINGS.terminalTransfers[creep.room.name]) || [];
-            
+
             let delivered = false;
-            
+
             // What are we carrying?
             const carrying = Object.keys(creep.store).find(res => creep.store[res as ResourceConstant] > 0) as ResourceConstant | undefined;
-            
+
             if (carrying) {
                 // Priority 1: Terminal (If it's on the transfer list and terminal isn't full of it)
                 if (terminal) {
@@ -68,8 +68,8 @@ export const roleMarketHauler: RoleHandler = {
                     }
                 }
             }
-        } 
-        
+        }
+
         // 3. FETCH PHASE
         else {
             let target: any = null;
@@ -95,33 +95,51 @@ export const roleMarketHauler: RoleHandler = {
             }
 
             // Priority 2: Extractor Minerals
-            if (!target) {
-                const extractor = creep.room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTRACTOR } })[0];
-                if (extractor) {
-                    // Check ground drops near extractor (minerals)
-                    const drops = creep.room.find(FIND_DROPPED_RESOURCES, {
-                        filter: r => r.resourceType !== RESOURCE_ENERGY && r.pos.inRangeTo(extractor, 1)
-                    });
-                    
-                    if (drops.length > 0) {
-                        target = drops[0];
-                    }
+            const extractor = creep.room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTRACTOR } })[0];
+            const mineral = creep.room.find(FIND_MINERALS)[0];
+            const quota = COLONY_SETTINGS.mineralQuotas[creep.room.name];
+            let needsMinerals = false;
+            if (extractor && mineral && quota !== undefined && creep.room.storage) {
+                const currentStock = creep.room.storage.store.getUsedCapacity(mineral.mineralType);
+                if (currentStock < quota) needsMinerals = true;
+            }
 
-                    // Check container near extractor
-                    if (!target) {
-                        const container = extractor.pos.findInRange(FIND_STRUCTURES, 1, {
-                            filter: s => s.structureType === STRUCTURE_CONTAINER
-                        })[0] as StructureContainer;
+            if (!target && needsMinerals && extractor) {
+                // Check ground drops near extractor (minerals)
+                const drops = creep.room.find(FIND_DROPPED_RESOURCES, {
+                    filter: r => r.resourceType !== RESOURCE_ENERGY && r.pos.inRangeTo(extractor, 1)
+                });
 
-                        if (container) {
-                            const specialMineral = Object.keys(container.store).find(res => res !== RESOURCE_ENERGY) as ResourceConstant;
-                            // Only fetch if > 100 to save CPU/trips
-                            if (specialMineral && container.store[specialMineral] > 100) {
-                                target = container;
-                                resourceToFetch = specialMineral;
-                            }
+                if (drops.length > 0) {
+                    target = drops[0];
+                }
+
+                // Check container near extractor
+                if (!target) {
+                    const container = extractor.pos.findInRange(FIND_STRUCTURES, 1, {
+                        filter: s => s.structureType === STRUCTURE_CONTAINER
+                    })[0] as StructureContainer;
+
+                    if (container) {
+                        const specialMineral = Object.keys(container.store).find(res => res !== RESOURCE_ENERGY) as ResourceConstant;
+                        // Only fetch if > 250 to save CPU/trips
+                        if (specialMineral && container.store[specialMineral] > 250) {
+                            target = container;
+                            resourceToFetch = specialMineral;
                         }
                     }
+                }
+            }
+
+            // RECYCLE CHECK: If no target found AND no work left to do
+            if (!target && !needsMinerals) {
+                // Double check if any transfers are still possible
+                const hasPendingTransfers = terminal && storage && transfers.some(t => (terminal.store[t.resource] || 0) < t.amount && (storage.store[t.resource] || 0) > 0);
+
+                if (!hasPendingTransfers) {
+                    creep.say('✅ All Done');
+                    creep.memory.recycle = true;
+                    return;
                 }
             }
 

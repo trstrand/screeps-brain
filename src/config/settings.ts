@@ -40,6 +40,7 @@ export const COLONY_SETTINGS: ColonySettings = {
     },
     mineralQuotas: {
         'E59S58': 10000,
+        "E55S58": 1e5
     },
     resourceTransfers: [
         { sourceRoom: 'E58S56', destRoom: 'E58S57', resource: RESOURCE_POWER, count: 2 }
@@ -56,10 +57,11 @@ export const COLONY_SETTINGS: ColonySettings = {
             dismantleMiner: 0,
             extractorMiner: 0,
             hauler: 1,
+            marketHauler: 0,
             upgradeHauler: 0,
             upgrader: 1,
             builder: 0,
-            repairer: 1,
+            repairer: 0,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
@@ -103,7 +105,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             upgradeHauler: 0,
             upgrader: 1,
             builder: 0,
-            repairer: 0,
+            repairer: 1,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
@@ -188,7 +190,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             dismantleMiner: 0,
             extractorMiner: 0,
             hauler: 2,
-            marketHauler: 1,
+            marketHauler: 0,
             upgradeHauler: 1,
             upgrader: 2,
             builder: 0,
@@ -227,6 +229,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             remoteBuilder: 0,
             claimer: 0
         },
+        /*
         "E59S56": {
             remoteMiner: 0,
             remoteHauler: 0,
@@ -237,6 +240,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             remoteHauler: 0,
             remoteRepairer: 0
         },
+        */
         "E59S58": {
             defender: 0,
             miner: 2,

@@ -36,7 +36,7 @@ export const roleMiner: RoleHandler = {
         }
 
         if (!activeSource || COLONY_SETTINGS.ignoredSources.includes(activeSource.id as any)) {
-            activeSource = creep.pos.findClosestByPath(FIND_SOURCES, {
+            activeSource = creep.pos.findClosestByRange(FIND_SOURCES, {
                 filter: (s) => !COLONY_SETTINGS.ignoredSources.includes(s.id as any) && s.pos.roomName === creep.room.name
             });
             if (COLONY_SETTINGS.debug) {

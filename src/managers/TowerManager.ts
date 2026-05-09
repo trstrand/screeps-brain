@@ -57,7 +57,8 @@ export class TowerManager {
             const isRoadCont = target.structureType === STRUCTURE_ROAD || target.structureType === STRUCTURE_CONTAINER;
 
             // "if target is repaired above 50%, search for other roads or containers below 25%"
-            if (isRoadCont && target.hits > target.hitsMax * 0.5) {
+            // Throttle this check to every 5 ticks to save CPU
+            if (isRoadCont && target.hits > target.hitsMax * 0.5 && Game.time % 5 === 0) {
                 const hasCritical = room.find(FIND_STRUCTURES, {
                     filter: s => (s.structureType === STRUCTURE_ROAD || s.structureType === STRUCTURE_CONTAINER) && s.hits < s.hitsMax * 0.25
                 }).length > 0;

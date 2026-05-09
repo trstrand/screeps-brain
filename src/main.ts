@@ -14,8 +14,7 @@ Creep.prototype.move = function (this: Creep, target: any) {
             const targetY = this.pos.y + dy[dir];
 
             if (targetX >= 0 && targetX <= 49 && targetY >= 0 && targetY <= 49) {
-                const targetPos = new RoomPosition(targetX, targetY, this.room.name);
-                const creeps = targetPos.lookFor(LOOK_CREEPS);
+                const creeps = this.room.lookForAt(LOOK_CREEPS, targetX, targetY);
                 
                 if (creeps.length > 0) {
                     const otherCreep = creeps[0];

@@ -161,18 +161,17 @@ export const rolePioneer: RoleHandler = {
                 });
 
                 const allLoot = [...dropped, ...tombstones, ...ruins];
-                target = creep.pos.findClosestByPath(allLoot, { ignoreCreeps: true });
+                target = creep.pos.findClosestByRange(allLoot);
                 
                 if (target) creep.memory.targetId = target.id;
             }
 
             // --- PRIORITY 3: STORAGE/CONTAINERS ---
             if (!target) {
-                target = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+                target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
                     filter: (s) => (s.structureType === STRUCTURE_CONTAINER || 
                                 (s.structureType === STRUCTURE_STORAGE && (s as StructureStorage).my)) &&
-                                s.store.getUsedCapacity(RESOURCE_ENERGY) > 200,
-                    ignoreCreeps: true
+                                s.store.getUsedCapacity(RESOURCE_ENERGY) > 200
                 });
                 if (target) creep.memory.targetId = target.id;
             }
