@@ -45,6 +45,9 @@ export const COLONY_SETTINGS: ColonySettings = {
         { sourceRoom: 'E58S56', destRoom: 'E58S57', resource: RESOURCE_POWER, count: 2 }
         // Options: RESOURCE_ENERGY, RESOURCE_POWER, RESOURCE_POWER, RESOURCE_HYDROGEN, RESOURCE_OXYGEN, RESOURCE_UTRIUM, RESOURCE_LEMERGIUM, RESOURCE_KEANIUM, RESOURCE_ZYNTHIUM, RESOURCE_CATALYST, RESOURCE_GHODIUM
     ],
+    terminalTransfers: {
+        // Example: 'E58S59': [{ resource: RESOURCE_ENERGY, amount: 50000 }, { resource: RESOURCE_OXYGEN, amount: 1000 }]
+    },
     debug: false,
     roomQuotas: {
         "E55S58": {
@@ -185,6 +188,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             dismantleMiner: 0,
             extractorMiner: 0,
             hauler: 2,
+            marketHauler: 1,
             upgradeHauler: 1,
             upgrader: 2,
             builder: 0,

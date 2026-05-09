@@ -38,6 +38,13 @@ export const CREEP_CONFIGS: Record<string, RoleBodyConfig> = {
         citadel: Array(20).fill(CARRY).concat(Array(10).fill(MOVE)),
         apex: Array(24).fill(CARRY).concat(Array(12).fill(MOVE))
     },
+    marketHauler: {
+        vanguard: [CARRY, CARRY, MOVE, MOVE],
+        sentinel: Array(4).fill(CARRY).concat(Array(4).fill(MOVE)),
+        bastion: Array(8).fill(CARRY).concat(Array(8).fill(MOVE)),
+        citadel: Array(12).fill(CARRY).concat(Array(12).fill(MOVE)),
+        apex: Array(16).fill(CARRY).concat(Array(16).fill(MOVE))
+    },
     upgradeHauler: {
         vanguard: [CARRY, CARRY, CARRY, CARRY, MOVE, MOVE],
         sentinel: Array(7).fill(CARRY).concat(Array(4).fill(MOVE)),

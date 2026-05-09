@@ -3,6 +3,7 @@ import { roleMiner } from './miner';
 import { roleDismantleMiner } from './dismantleMiner';
 import { roleExtractorMiner } from './extractorMiner';
 import { roleHauler } from './hauler';
+import { roleMarketHauler } from './marketHauler';
 import { roleUpgradeHauler } from './upgradeHauler';
 import { roleUpgrader } from './upgrader';
 import { roleBuilder } from './builder';
@@ -26,6 +27,7 @@ export const RoleRegistry: Record<string, RoleHandler> = {
     'dismantleMiner': roleDismantleMiner,
     'extractorMiner': roleExtractorMiner,
     'hauler': roleHauler,
+    'marketHauler': roleMarketHauler,
     'upgradeHauler': roleUpgradeHauler,
     'upgrader': roleUpgrader,
     'builder': roleBuilder,

@@ -10,6 +10,7 @@ const SPAWN_PRIORITY: string[] = [
     'repairer',
     'builder',
     'upgradeHauler',
+    'marketHauler',
     'extractorMiner',
     'salvager',
     'transferHauler',

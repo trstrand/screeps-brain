@@ -11,6 +11,7 @@ declare global {
         dismantleMiner?: number;
         extractorMiner?: number;
         hauler?: number;
+        marketHauler?: number;
         upgradeHauler?: number;
         upgrader?: number;
         builder?: number;
@@ -56,6 +57,7 @@ declare global {
         roomQuotas: { [roomName: string]: RoomQuota };
         remoteMining: { [roomName: string]: string[] };
         mineralQuotas: { [roomName: string]: number };
+        terminalTransfers?: { [roomName: string]: { resource: ResourceConstant, amount: number }[] };
         resourceTransfers?: ResourceTransfer[];
         debug: boolean;
     }
