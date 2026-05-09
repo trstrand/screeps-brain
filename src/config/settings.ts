@@ -179,6 +179,28 @@ export const COLONY_SETTINGS: ColonySettings = {
             remoteBuilder: 0,
             claimer: 0
         },
+        "E58S59": {
+            defender: 0,
+            miner: 2,
+            dismantleMiner: 0,
+            extractorMiner: 0,
+            hauler: 2,
+            upgradeHauler: 1,
+            upgrader: 2,
+            builder: 0,
+            repairer: 1,
+            salvager: 0,
+            transferHauler: 0,
+            remoteMiner: 0,
+            remoteHauler: 0,
+            remoteExtractorMiner: 0,
+            pioneer: 0,
+            expedition: 0,
+            vanguard: 0,
+            breaker: 0,
+            remoteBuilder: 0,
+            claimer: 0
+        },
         "E59S55": {
             defender: 0,
             miner: 2,
