@@ -175,7 +175,33 @@ export const roleBuilder: RoleHandler = {
                             ...creep.room.find(FIND_DROPPED_RESOURCES, { filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 25 })
                         ];
 
-                        target = creep.pos.findClosestByPath(candidates, { ignoreCreeps: true });
+                        let validTarget = null;
+                        let currentCandidates = [...candidates];
+                        
+                        while (currentCandidates.length > 0) {
+                            const closest = creep.pos.findClosestByRange(currentCandidates);
+                            if (!closest) break;
+
+                            // Reachability check for non-structures
+                            if ('amount' in closest || closest instanceof Tombstone || closest instanceof Ruin) {
+                                const path = creep.room.findPath(creep.pos, closest.pos, { ignoreCreeps: true, maxOps: 200 });
+                                const isReachable = path.length > 0 && path[path.length - 1].x === closest.pos.x && path[path.length - 1].y === closest.pos.y;
+                                
+                                if (isReachable || creep.pos.isNearTo(closest.pos)) {
+                                    validTarget = closest;
+                                    break;
+                                } else {
+                                    // Remove and try next closest
+                                    const index = currentCandidates.indexOf(closest);
+                                    if (index > -1) currentCandidates.splice(index, 1);
+                                }
+                            } else {
+                                // Assume structures are reachable (or rely on Stuck Detection)
+                                validTarget = closest;
+                                break;
+                            }
+                        }
+                        target = validTarget;
                     }
                     if (target) {
                         creep.memory.targetId = target.id;

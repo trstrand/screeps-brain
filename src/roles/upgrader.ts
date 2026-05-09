@@ -73,11 +73,10 @@ export const roleUpgrader: RoleHandler = {
             let target = Game.getObjectById(creep.memory.targetId as Id<any>);
             
             if (!target || (target instanceof Structure && target.store.getUsedCapacity(RESOURCE_ENERGY) === 0)) {
-                target = creep.pos.findClosestByPath(FIND_STRUCTURES, {
-                    filter: (s) => (s.structureType === STRUCTURE_STORAGE || s.structureType === STRUCTURE_CONTAINER) &&
-                                 s.id !== container?.id && s.id !== link?.id && s.store.getUsedCapacity(RESOURCE_ENERGY) > 0
-                });
-                if (target) creep.memory.targetId = target.id;
+                if (creep.room.storage && creep.room.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    target = creep.room.storage;
+                    creep.memory.targetId = target.id;
+                }
             }
 
             if (target) {
