@@ -84,6 +84,8 @@ declare global {
         fullTripTicks?: number;
         idleTicks?: number;
         dismantleExtensions?: boolean;
+        lastPos?: { x: number, y: number, roomName: string };
+        stuckCount?: number;
     }
 
     interface RoomMemory {

@@ -5,6 +5,26 @@ export const roleSalvager: RoleHandler = {
             creep.memory.tripStartTick = Game.time;
         }
 
+        // --- STUCK DETECTION ---
+        if (creep.memory.targetId) {
+            const lastPos = creep.memory.lastPos;
+            if (lastPos && lastPos.x === creep.pos.x && lastPos.y === creep.pos.y && lastPos.roomName === creep.room.name) {
+                creep.memory.stuckCount = (creep.memory.stuckCount || 0) + 1;
+            } else {
+                creep.memory.stuckCount = 0;
+            }
+            creep.memory.lastPos = { x: creep.pos.x, y: creep.pos.y, roomName: creep.room.name };
+
+            if ((creep.memory.stuckCount || 0) > 5) {
+                delete creep.memory.targetId;
+                creep.memory.stuckCount = 0;
+                creep.say('🔄 Stuck!');
+            }
+        } else {
+            delete creep.memory.lastPos;
+            creep.memory.stuckCount = 0;
+        }
+
         // 1. STATE MACHINE
         if (creep.memory.working && creep.store.getFreeCapacity() === 0) {
             creep.memory.working = false;
@@ -60,22 +80,25 @@ export const roleSalvager: RoleHandler = {
             if (!target) {
                 // FIND TARGETS WITH NEW PRIORITY
                 // 1. Dropped Resources, Tombstones, Ruins
-                target = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
+                target = creep.pos.findClosestByPath(FIND_DROPPED_RESOURCES, {
                     filter: (r: Resource) => {
                         if (!salvageEnergy && r.resourceType === RESOURCE_ENERGY) return false;
                         const isNearSource = r.pos.findInRange(FIND_SOURCES, 2).length > 0;
                         return isNearSource ? r.amount > 400 : r.amount > 50;
-                    }
-                }) || creep.pos.findClosestByRange(FIND_TOMBSTONES, { 
+                    },
+                    ignoreCreeps: true
+                }) || creep.pos.findClosestByPath(FIND_TOMBSTONES, { 
                     filter: (t: Tombstone) => {
                         if (!salvageEnergy && t.store.getUsedCapacity() === t.store.getUsedCapacity(RESOURCE_ENERGY)) return false;
                         return t.store.getUsedCapacity() > 100;
-                    }
-                }) || creep.pos.findClosestByRange(FIND_RUINS, { 
+                    },
+                    ignoreCreeps: true
+                }) || creep.pos.findClosestByPath(FIND_RUINS, { 
                     filter: (r: Ruin) => {
                         if (!salvageEnergy && r.store.getUsedCapacity() === r.store.getUsedCapacity(RESOURCE_ENERGY)) return false;
                         return r.store.getUsedCapacity() > 100;
-                    }
+                    },
+                    ignoreCreeps: true
                 });
 
                 // 2. Containers (if enabled)
@@ -92,7 +115,7 @@ export const roleSalvager: RoleHandler = {
                             return !nearSource && !nearController;
                         });
                         
-                        target = priorityContainers.length > 0 ? creep.pos.findClosestByRange(priorityContainers) : creep.pos.findClosestByRange(containers);
+                        target = priorityContainers.length > 0 ? creep.pos.findClosestByPath(priorityContainers, { ignoreCreeps: true }) : creep.pos.findClosestByPath(containers, { ignoreCreeps: true });
                     }
                 }
 

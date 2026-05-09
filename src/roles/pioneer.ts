@@ -33,6 +33,26 @@ export const rolePioneer: RoleHandler = {
             // but we've already issued a move command to get off the edge.
         }
 
+        // --- STUCK DETECTION ---
+        if (creep.memory.targetId) {
+            const lastPos = creep.memory.lastPos;
+            if (lastPos && lastPos.x === creep.pos.x && lastPos.y === creep.pos.y && lastPos.roomName === creep.room.name) {
+                creep.memory.stuckCount = (creep.memory.stuckCount || 0) + 1;
+            } else {
+                creep.memory.stuckCount = 0;
+            }
+            creep.memory.lastPos = { x: creep.pos.x, y: creep.pos.y, roomName: creep.room.name };
+
+            if ((creep.memory.stuckCount || 0) > 10) { // Slightly higher for pioneers as they travel more
+                delete creep.memory.targetId;
+                creep.memory.stuckCount = 0;
+                creep.say('🔄 Stuck!');
+            }
+        } else {
+            delete creep.memory.lastPos;
+            creep.memory.stuckCount = 0;
+        }
+
         // --- 1. STATE MACHINE ---
         // Toggle working state based on energy levels
         if (creep.memory.working && creep.store.getUsedCapacity() === 0) {
@@ -141,17 +161,18 @@ export const rolePioneer: RoleHandler = {
                 });
 
                 const allLoot = [...dropped, ...tombstones, ...ruins];
-                target = creep.pos.findClosestByRange(allLoot);
+                target = creep.pos.findClosestByPath(allLoot, { ignoreCreeps: true });
                 
                 if (target) creep.memory.targetId = target.id;
             }
 
             // --- PRIORITY 3: STORAGE/CONTAINERS ---
             if (!target) {
-                target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+                target = creep.pos.findClosestByPath(FIND_STRUCTURES, {
                     filter: (s) => (s.structureType === STRUCTURE_CONTAINER || 
                                 (s.structureType === STRUCTURE_STORAGE && (s as StructureStorage).my)) &&
-                                s.store.getUsedCapacity(RESOURCE_ENERGY) > 200
+                                s.store.getUsedCapacity(RESOURCE_ENERGY) > 200,
+                    ignoreCreeps: true
                 });
                 if (target) creep.memory.targetId = target.id;
             }

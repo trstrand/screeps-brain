@@ -42,7 +42,7 @@ export const COLONY_SETTINGS: ColonySettings = {
         'E59S58': 10000,
     },
     resourceTransfers: [
-        { sourceRoom: 'E59S55', destRoom: 'E58S57', resource: RESOURCE_POWER, count: 2 }
+        { sourceRoom: 'E58S56', destRoom: 'E58S57', resource: RESOURCE_POWER, count: 2 }
         // Options: RESOURCE_ENERGY, RESOURCE_POWER, RESOURCE_POWER, RESOURCE_HYDROGEN, RESOURCE_OXYGEN, RESOURCE_UTRIUM, RESOURCE_LEMERGIUM, RESOURCE_KEANIUM, RESOURCE_ZYNTHIUM, RESOURCE_CATALYST, RESOURCE_GHODIUM
     ],
     debug: false,
@@ -87,7 +87,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             pioneer: 0,
             expedition: 0,
             vanguard: 0,
-            breaker: 2,
+            breaker: 1,
             remoteBuilder: 0,
             claimer: 0
         },

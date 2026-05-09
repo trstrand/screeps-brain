@@ -19,6 +19,27 @@ export const roleHauler: RoleHandler = {
             return;
         }
 
+        // --- STUCK DETECTION ---
+        if (creep.memory.targetId || creep.memory.deliveryTargetId) {
+            const lastPos = creep.memory.lastPos;
+            if (lastPos && lastPos.x === creep.pos.x && lastPos.y === creep.pos.y && lastPos.roomName === creep.room.name) {
+                creep.memory.stuckCount = (creep.memory.stuckCount || 0) + 1;
+            } else {
+                creep.memory.stuckCount = 0;
+            }
+            creep.memory.lastPos = { x: creep.pos.x, y: creep.pos.y, roomName: creep.room.name };
+
+            if ((creep.memory.stuckCount || 0) > 5) {
+                delete creep.memory.targetId;
+                delete creep.memory.deliveryTargetId;
+                creep.memory.stuckCount = 0;
+                creep.say('🔄 Stuck!');
+            }
+        } else {
+            delete creep.memory.lastPos;
+            creep.memory.stuckCount = 0;
+        }
+
         // --- PRE-LOAD CACHE ---
         const allDrops = creep.room.find(FIND_DROPPED_RESOURCES);
         const allTombstones = creep.room.find(FIND_TOMBSTONES);
@@ -209,7 +230,7 @@ export const roleHauler: RoleHandler = {
                     }
 
                     if (proximityTargets.length > 0) {
-                        target = creep.pos.findClosestByRange(proximityTargets);
+                        target = creep.pos.findClosestByPath(proximityTargets, { ignoreCreeps: true });
                     }
                 }
             }
@@ -245,7 +266,7 @@ export const roleHauler: RoleHandler = {
                     nearbyDrops.push(...allTombstones.filter(t => t.store.getUsedCapacity(RESOURCE_ENERGY) >= 50 && t.creep.my && t.pos.inRangeTo(spawn, 3)));
                 }
                 if (nearbyDrops.length > 0) {
-                    target = creep.pos.findClosestByRange(nearbyDrops);
+                    target = creep.pos.findClosestByPath(nearbyDrops, { ignoreCreeps: true });
                 }
 
                 // Priority 1.5: Hub Refill (Storage -> Spawns/Extensions)
@@ -260,7 +281,7 @@ export const roleHauler: RoleHandler = {
                 if (!target) {
                     const drops = allDrops.filter(r => r.resourceType === RESOURCE_ENERGY && r.amount > 50 && isNearSource(r.pos));
                     if (drops.length > 0) {
-                        target = creep.pos.findClosestByRange(drops);
+                        target = creep.pos.findClosestByPath(drops, { ignoreCreeps: true });
                     }
                 }
 
@@ -316,7 +337,7 @@ export const roleHauler: RoleHandler = {
                 if (!target) {
                     const otherTombstones = allTombstones.filter(t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && t.creep.my);
                     if (otherTombstones.length > 0) {
-                        target = creep.pos.findClosestByRange(otherTombstones);
+                        target = creep.pos.findClosestByPath(otherTombstones, { ignoreCreeps: true });
                     }
                 }
 

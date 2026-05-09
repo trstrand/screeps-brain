@@ -14,6 +14,27 @@ export const roleRepairer: RoleHandler = {
             creep.say('🔧 Repair');
         }
 
+        // --- STUCK DETECTION ---
+        if (creep.memory.targetId || (creep.memory as any).repairTargetId) {
+            const lastPos = creep.memory.lastPos;
+            if (lastPos && lastPos.x === creep.pos.x && lastPos.y === creep.pos.y && lastPos.roomName === creep.room.name) {
+                creep.memory.stuckCount = (creep.memory.stuckCount || 0) + 1;
+            } else {
+                creep.memory.stuckCount = 0;
+            }
+            creep.memory.lastPos = { x: creep.pos.x, y: creep.pos.y, roomName: creep.room.name };
+
+            if ((creep.memory.stuckCount || 0) > 5) {
+                delete creep.memory.targetId;
+                delete (creep.memory as any).repairTargetId;
+                creep.memory.stuckCount = 0;
+                creep.say('🔄 Stuck!');
+            }
+        } else {
+            delete creep.memory.lastPos;
+            creep.memory.stuckCount = 0;
+        }
+
         // 2. Work Phase
         if (creep.memory.working) {
             // 2. LOGISTICS: Home Room Guard
@@ -147,7 +168,7 @@ export const roleRepairer: RoleHandler = {
                     filter: r => r.store[RESOURCE_ENERGY] > 0
                 });
 
-                const loot = creep.pos.findClosestByRange([...dropped, ...tombstones, ...ruins]);
+                const loot = creep.pos.findClosestByPath([...dropped, ...tombstones, ...ruins], { ignoreCreeps: true });
 
                 if (loot) {
                     target = loot;
@@ -166,9 +187,10 @@ export const roleRepairer: RoleHandler = {
                         target = hostileStorage;
                     } else {
                         // Priority 3: Structured Energy (Containers/Storage)
-                        const energySource = creep.pos.findClosestByRange(FIND_STRUCTURES, {
+                        const energySource = creep.pos.findClosestByPath(FIND_STRUCTURES, {
                             filter: (s) => (s.structureType === STRUCTURE_CONTAINER || (s.structureType === STRUCTURE_STORAGE && (s as StructureStorage).my)) &&
-                                s.store.getUsedCapacity(RESOURCE_ENERGY) > 25
+                                s.store.getUsedCapacity(RESOURCE_ENERGY) > 25,
+                            ignoreCreeps: true
                         });
 
                         if (energySource) {

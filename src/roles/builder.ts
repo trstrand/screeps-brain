@@ -16,6 +16,26 @@ export const roleBuilder: RoleHandler = {
             creep.say('🏠 returning');
             return;
         }
+
+        // --- STUCK DETECTION ---
+        if (creep.memory.targetId) {
+            const lastPos = creep.memory.lastPos;
+            if (lastPos && lastPos.x === creep.pos.x && lastPos.y === creep.pos.y && lastPos.roomName === creep.room.name) {
+                creep.memory.stuckCount = (creep.memory.stuckCount || 0) + 1;
+            } else {
+                creep.memory.stuckCount = 0;
+            }
+            creep.memory.lastPos = { x: creep.pos.x, y: creep.pos.y, roomName: creep.room.name };
+
+            if ((creep.memory.stuckCount || 0) > 5) {
+                delete creep.memory.targetId;
+                creep.memory.stuckCount = 0;
+                creep.say('🔄 Stuck!');
+            }
+        } else {
+            delete creep.memory.lastPos;
+            creep.memory.stuckCount = 0;
+        }
         // 1. State Machine: Toggle Working State
         if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) {
             creep.memory.working = false;
@@ -155,7 +175,7 @@ export const roleBuilder: RoleHandler = {
                             ...creep.room.find(FIND_DROPPED_RESOURCES, { filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 25 })
                         ];
 
-                        target = creep.pos.findClosestByRange(candidates);
+                        target = creep.pos.findClosestByPath(candidates, { ignoreCreeps: true });
                     }
                     if (target) {
                         creep.memory.targetId = target.id;

@@ -4,6 +4,26 @@ export const roleUpgradeHauler: RoleHandler = {
         const allDrops = creep.room.find(FIND_DROPPED_RESOURCES);
         const allTombstones = creep.room.find(FIND_TOMBSTONES);
 
+        // --- STUCK DETECTION ---
+        if (creep.memory.targetId) {
+            const lastPos = creep.memory.lastPos;
+            if (lastPos && lastPos.x === creep.pos.x && lastPos.y === creep.pos.y && lastPos.roomName === creep.room.name) {
+                creep.memory.stuckCount = (creep.memory.stuckCount || 0) + 1;
+            } else {
+                creep.memory.stuckCount = 0;
+            }
+            creep.memory.lastPos = { x: creep.pos.x, y: creep.pos.y, roomName: creep.room.name };
+
+            if ((creep.memory.stuckCount || 0) > 5) {
+                delete creep.memory.targetId;
+                creep.memory.stuckCount = 0;
+                creep.say('🔄 Stuck!');
+            }
+        } else {
+            delete creep.memory.lastPos;
+            creep.memory.stuckCount = 0;
+        }
+
         // 1. STATE MACHINE
         if (creep.memory.working && creep.store.getUsedCapacity() === 0) {
             creep.memory.working = false;
@@ -138,7 +158,7 @@ export const roleUpgradeHauler: RoleHandler = {
                                     Object.keys(r.store).some((res: string) => res !== RESOURCE_ENERGY && r.store[res as ResourceConstant] > 0)
                             })
                         ];
-                        target = creep.pos.findClosestByRange(mineralCandidates);
+                        target = creep.pos.findClosestByPath(mineralCandidates, { ignoreCreeps: true });
                     }
                 }
 
@@ -184,7 +204,7 @@ export const roleUpgradeHauler: RoleHandler = {
                                 }
                             }) as (StructureStorage | StructureContainer)[]
                         ];
-                        target = creep.pos.findClosestByRange(energySources);
+                        target = creep.pos.findClosestByPath(energySources, { ignoreCreeps: true });
                     }
                 }
 
