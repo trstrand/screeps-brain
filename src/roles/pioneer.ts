@@ -101,9 +101,9 @@ export const rolePioneer: RoleHandler = {
 
         // If we are not in Home or Target room, we should probably be moving towards one of them
         // unless we found energy in the current room.
-        if (creep.room.name !== homeRoom && creep.room.name !== targetRoom) {
+        if (homeRoom && creep.room.name !== homeRoom && creep.room.name !== targetRoom) {
             // Priority: Get to HomeRoom to refill if we are empty and in transit
-            creep.moveTo(new RoomPosition(25, 25, homeRoom!), { 
+            creep.moveTo(new RoomPosition(25, 25, homeRoom), { 
                 visualizePathStyle: { stroke: '#ffaa00', lineStyle: 'dotted' },
                 reusePath: 50
             });
