@@ -42,22 +42,25 @@ export const roleUpgrader: RoleHandler = {
 
         // 4. Execution
         if (creep.memory.working) {
-            // Position ourselves
-            if (container) {
-                // Stay on container
-                if (!creep.pos.isEqualTo(container.pos)) {
+            // Position ourselves: 
+            // - If we are on the container, stay there.
+            // - If we aren't, move to range 1 of the container/link (or range 0 if it's empty).
+            const onSpot = container && creep.pos.isEqualTo(container.pos);
+            
+            if (container && !onSpot) {
+                // Try to get on the container, but don't get stuck if it's occupied
+                const isOccupied = container.pos.lookFor(LOOK_CREEPS).length > 0;
+                if (!isOccupied) {
                     creep.moveTo(container, { range: 0 });
+                } else {
+                    creep.moveTo(container, { range: 1 });
                 }
-            } else if (link) {
-                // If no container but link exists, stay in range 1 of link
-                if (creep.pos.getRangeTo(link) > 1) {
-                    creep.moveTo(link, { range: 1 });
-                }
+            } else if (link && !onSpot) {
+                creep.moveTo(link, { range: 1 });
             }
 
             const result = creep.upgradeController(controller);
             if (result === ERR_NOT_IN_RANGE) {
-                // Ensure we are in range of controller (priority if link/container positioning fails)
                 creep.moveTo(controller, { range: 3 });
             }
 
