@@ -12,7 +12,7 @@ export const roleUpgrader: RoleHandler = {
         })[0] as StructureContainer | undefined;
 
         // Check memory for controllerLink, fallback to search
-        let link = Game.getObjectById(creep.room.memory.controllerLink as Id<StructureLink>);
+        let link: StructureLink | null | undefined = Game.getObjectById(creep.room.memory.controllerLink as Id<StructureLink>);
         if (!link) {
             link = controller.pos.findInRange(FIND_MY_STRUCTURES, 3, {
                 filter: s => s.structureType === STRUCTURE_LINK
@@ -65,14 +65,14 @@ export const roleUpgrader: RoleHandler = {
             }
 
             // Passive Repair
-            if (container && container.hits < container.hitsMax * 0.8) {
+            if (container && creep.pos.isEqualTo(container.pos) && container.hits < container.hitsMax * 0.8) {
                 creep.repair(container);
             }
         } else {
             // Refill Phase: Go to the nearest non-controller container or storage
-            let target = Game.getObjectById(creep.memory.targetId as Id<any>);
+            let target = Game.getObjectById(creep.memory.targetId as Id<StructureStorage | StructureContainer>);
             
-            if (!target || (target instanceof Structure && target.store.getUsedCapacity(RESOURCE_ENERGY) === 0)) {
+            if (!target || target.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
                 if (creep.room.storage && creep.room.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                     target = creep.room.storage;
                     creep.memory.targetId = target.id;

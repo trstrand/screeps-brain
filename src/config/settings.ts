@@ -1,39 +1,37 @@
 export const COLONY_SETTINGS: ColonySettings = {
-    expeditionTargets: ['E59S55'],
-    pioneerTarget: 'E59S55',
-    breakerTarget: { room: 'E58S59', id: '66fea842535f3f45d9e35bc3' },
-    defendRoom: 'E57S56',
+    expeditionTargets: [''],
+    pioneerTarget: '',
+    breakerTarget: { room: 'E59S59', id: '690d88caa530f0e7ef6ff26f' },
+    defendRoom: '',
     salvageRoom: '', // Leave empty to salvage in the home room, or set a target room string
     salvageContainers: false,
     salvageEnergy: false,
     depositHome: true,
-    remoteBuild: 'E59S57',
-    claimRoom: 'E57S56',
+    remoteBuild: '',
+    claimRoom: '',
     ignoredSources: ['none'],
     //dismantle targets and wall/rampart attack settings
     dismantleTargets: {
-        "E58S58": '6654f475659b91ae40301a05',
-        "E59S55": "68f127fb02f4a7f03705c8f9",
-        //rooms I want to break into to get to the controller
-        "E58S59": '66fea842535f3f45d9e35bc3',
-        "E59S59": '690d88dcd4824c61d123c725'
+        "E59S59": '690d88caa530f0e7ef6ff26f'
     },
-    attackWalls: true,
+    attackWalls: false,
     attackRamparts: false,
     //wall and rampart repair settings
     roomWallMaxHits: {
         "E59S58": 25e4,
-        'E58S58': 1e5,
+        "E58S58": 1e5,
         "E58S57": 1e5,
         "E57S57": 1e5,
-        "E55S58": 1e5
+        "E55S58": 1e5,
+        "E59S55": 1e5
     },
     roomRampartMaxHits: {
         "E59S58": 1e5,
-        'E58S58': 1e4,
+        "E58S58": 1e4,
         "E58S57": 1e5,
         "E57S57": 1e4,
-        "E55S58": 1e4
+        "E55S58": 1e4,
+        "E59S55": 1e5
     },
     remoteMining: {
         'E58S57': ['E58S56', 'E5S56'], // Example: 'HomeRoom': ['RemoteRoom1', 'RemoteRoom2']
@@ -189,10 +187,10 @@ export const COLONY_SETTINGS: ColonySettings = {
             miner: 2,
             dismantleMiner: 0,
             extractorMiner: 0,
-            hauler: 2,
+            hauler: 1,
             marketHauler: 0,
-            upgradeHauler: 1,
-            upgrader: 2,
+            upgradeHauler: 0,
+            upgrader: 1,
             builder: 0,
             repairer: 1,
             salvager: 0,
