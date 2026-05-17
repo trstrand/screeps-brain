@@ -50,9 +50,9 @@ export const roleMiner: RoleHandler = {
         const container = activeSource.pos.findInRange<StructureContainer>(FIND_STRUCTURES, 1, {
             filter: s => s.structureType === STRUCTURE_CONTAINER
         })[0];
-        const link = activeSource.pos.findInRange<StructureLink>(FIND_MY_STRUCTURES, 2, {
+        const link = container ? container.pos.findInRange<StructureLink>(FIND_MY_STRUCTURES, 1, {
             filter: s => s.structureType === STRUCTURE_LINK
-        })[0];
+        })[0] : null;
 
         // --- 5. STATIC CANISTER MINER (If Container Exists) ---
         if (container) {

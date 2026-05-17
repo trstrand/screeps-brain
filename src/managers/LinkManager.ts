@@ -15,8 +15,11 @@ export class LinkManager {
                 const controller = room.controller;
                 const storage = room.storage;
 
-                const controllerLink = controller ? controller.pos.findInRange(allLinks, 3)[0] : null;
-                const storageLink = storage ? storage.pos.findInRange(allLinks, 3)[0] : null;
+                const controllerLinks = controller ? controller.pos.findInRange(allLinks, 3) : [];
+                const controllerLink = controller ? controller.pos.findClosestByRange(controllerLinks) : null;
+
+                const storageLinks = storage ? storage.pos.findInRange(allLinks, 3) : [];
+                const storageLink = storage ? storage.pos.findClosestByRange(storageLinks) : null;
 
                 if (controllerLink) room.memory.controllerLink = controllerLink.id;
                 if (storageLink) room.memory.storageLink = storageLink.id;
@@ -56,7 +59,7 @@ export class LinkManager {
         // if it exists and if that link/controller < 75% full of energy, 
         // otherwise if a link near room.storage exists, send energy to link/room.storage if it is less than 100% full
         const processSourceLink = (sLink: StructureLink | null) => {
-            if (!sLink || sLink.cooldown > 0 || sLink.store.getUsedCapacity(RESOURCE_ENERGY) === 0) return;
+            if (!sLink || sLink.cooldown > 0 || sLink.store.getUsedCapacity(RESOURCE_ENERGY) < (sLink.store.getCapacity(RESOURCE_ENERGY) * 0.5)) return;
 
             if (controllerLink && controllerLink.store.getUsedCapacity(RESOURCE_ENERGY) < (controllerLink.store.getCapacity(RESOURCE_ENERGY) * 0.75)) {
                 sLink.transferEnergy(controllerLink);
@@ -75,7 +78,7 @@ export class LinkManager {
         // Rule 3: If there are only links near the room.storage and room.controller, 
         // send energy from the link/room.storage to the link/room.controller if it is less than 75% full of energy
         if (!hasSourceLink && storageLink && controllerLink) {
-            if (storageLink.cooldown === 0 && storageLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+            if (storageLink.cooldown === 0 && storageLink.store.getUsedCapacity(RESOURCE_ENERGY) >= (storageLink.store.getCapacity(RESOURCE_ENERGY) * 0.5)) {
                 if (controllerLink.store.getUsedCapacity(RESOURCE_ENERGY) < (controllerLink.store.getCapacity(RESOURCE_ENERGY) * 0.75)) {
                     storageLink.transferEnergy(controllerLink);
                 }
