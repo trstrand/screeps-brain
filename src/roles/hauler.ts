@@ -427,8 +427,14 @@ export const roleHauler: RoleHandler = {
                 const hasMinEnergy = creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 50;
 
                 if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                    // Only deliver if mostly full, or if we have at least 50 energy and the room is in critical need
-                    if (isMostlyFull || (hasMinEnergy && !this.shuttleCheck(creep.room))) {
+                    const towersBelow90 = creep.room.find(FIND_MY_STRUCTURES, {
+                        filter: s => s.structureType === STRUCTURE_TOWER &&
+                            s.store.getUsedCapacity(RESOURCE_ENERGY) < (s.store.getCapacity(RESOURCE_ENERGY) * 0.9)
+                    }).length > 0;
+
+                    // Only deliver if mostly full, or if we have at least 50 energy and the room is in critical need,
+                    // OR if we have at least 50 energy and any towers are below 90%
+                    if (isMostlyFull || (hasMinEnergy && !this.shuttleCheck(creep.room)) || (hasMinEnergy && towersBelow90)) {
                         creep.memory.working = true;
                         creep.say('📦 Deliver');
                     } else {
