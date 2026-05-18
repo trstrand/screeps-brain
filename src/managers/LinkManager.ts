@@ -66,7 +66,7 @@ export class LinkManager {
                 return;
             }
 
-            if (storageLink && storageLink.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+            if (storageLink && storageLink.store.getUsedCapacity(RESOURCE_ENERGY) <= (storageLink.store.getCapacity(RESOURCE_ENERGY) * 0.9)) {
                 sLink.transferEnergy(storageLink);
                 return;
             }
