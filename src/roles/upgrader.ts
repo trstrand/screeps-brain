@@ -59,14 +59,15 @@ export const roleUpgrader: RoleHandler = {
                 creep.moveTo(link, { range: 1 });
             }
 
-            const result = creep.upgradeController(controller);
-            if (result === ERR_NOT_IN_RANGE) {
-                creep.moveTo(controller, { range: 3 });
-            }
-
-            // Passive Repair
-            if (container && creep.pos.isEqualTo(container.pos) && container.hits < container.hitsMax * 0.8) {
+            // Passive Repair (Prioritize repairing container if below 95%)
+            if (container && creep.pos.isEqualTo(container.pos) && container.hits < container.hitsMax * 0.95) {
                 creep.repair(container);
+                creep.say('🔧 Repair');
+            } else {
+                const result = creep.upgradeController(controller);
+                if (result === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(controller, { range: 3 });
+                }
             }
         } else {
             // Refill Phase: Go to the nearest non-controller container or storage
