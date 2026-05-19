@@ -18,34 +18,28 @@ export const COLONY_SETTINGS: ColonySettings = {
     attackRamparts: false,
     //wall and rampart repair settings
     roomWallMaxHits: {
-        "E55S58": 3e5,
-        "E57S56": 1e3,
-        "E57S57": 1e5,
-        "E58S56": 1e3,
-        "E58S57": 1e5,
-        "E58S58": 1e5,
-        "E58S59": 1e3,
-        "E59S55": 1e4,
-        "E59S58": 3e5
+        "E55S58": 1e5,
+        "E59S58": 1e4,
+        "E58S58": 1e4,
+        "E58S57": 1e4,
+        "E57S57": 1e4,
+
+        "E59S55": 1e4
     },
     roomRampartMaxHits: {
-        "E55S58": 3e5,
-        "E57S56": 1e3,
-        "E57S57": 1e5,
-        "E58S56": 1e3,
-        "E58S57": 1e5,
-        "E58S58": 1e5,
-        "E58S59": 1e3,
-        "E59S55": 1e5,
-        "E59S58": 3e5
+        "E55S58": 1e5,
+        "E59S58": 1e4,
+        "E58S58": 1e4,
+        "E58S57": 1e4,
+        "E57S57": 1e4,
+        "E59S55": 1e4
     },
     remoteMining: {
         'E58S57': ['E58S56', 'E5S56'], // Example: 'HomeRoom': ['RemoteRoom1', 'RemoteRoom2']
     },
     mineralQuotas: {
-        "E55S58": 1e5,
-        'E59S58': 1e5
-
+        'E59S58': 10000,
+        "E55S58": 1e5
     },
     resourceTransfers: [
         { sourceRoom: 'E58S56', destRoom: 'E58S57', resource: RESOURCE_POWER, count: 2 }
@@ -112,7 +106,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             upgradeHauler: 0,
             upgrader: 1,
             builder: 0,
-            repairer: 0,
+            repairer: 1,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
@@ -135,7 +129,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             upgradeHauler: 0,
             upgrader: 1,
             builder: 0,
-            repairer: 0,
+            repairer: 1,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
@@ -158,7 +152,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             upgradeHauler: 0,
             upgrader: 1,
             builder: 0,
-            repairer: 0,
+            repairer: 1,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
@@ -181,7 +175,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             upgradeHauler: 0,
             upgrader: 1,
             builder: 0,
-            repairer: 0,
+            repairer: 1,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
@@ -262,7 +256,7 @@ export const COLONY_SETTINGS: ColonySettings = {
             upgradeHauler: 0,
             upgrader: 1,
             builder: 0,
-            repairer: 0,
+            repairer: 1,
             salvager: 0,
             transferHauler: 0,
             remoteMiner: 0,
