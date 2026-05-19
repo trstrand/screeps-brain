@@ -1,14 +1,58 @@
 export const roleSalvager: RoleHandler = {
     run(creep: Creep): void {
+        // 0. LIFECYCLE MANAGEMENT
+        if (!creep.memory.tripStartTick) {
+            creep.memory.tripStartTick = Game.time;
+        }
+
+        // --- STUCK DETECTION ---
+        if (creep.memory.targetId) {
+            const lastPos = creep.memory.lastPos;
+            if (lastPos && lastPos.x === creep.pos.x && lastPos.y === creep.pos.y && lastPos.roomName === creep.room.name) {
+                creep.memory.stuckCount = (creep.memory.stuckCount || 0) + 1;
+            } else {
+                creep.memory.stuckCount = 0;
+            }
+            creep.memory.lastPos = { x: creep.pos.x, y: creep.pos.y, roomName: creep.room.name };
+
+            if ((creep.memory.stuckCount || 0) > 5) {
+                delete creep.memory.targetId;
+                creep.memory.stuckCount = 0;
+                creep.say('🔄 Stuck!');
+            }
+        } else {
+            delete creep.memory.lastPos;
+            creep.memory.stuckCount = 0;
+        }
+
         // 1. STATE MACHINE
         if (creep.memory.working && creep.store.getFreeCapacity() === 0) {
             creep.memory.working = false;
             creep.say('📦 Storing');
         }
+        
         if (!creep.memory.working && creep.store.getUsedCapacity() === 0) {
+            // Completion of a full trip
+            if (creep.memory.tripStartTick) {
+                const tripDuration = Game.time - creep.memory.tripStartTick;
+                creep.memory.fullTripTicks = Math.max(creep.memory.fullTripTicks || 0, tripDuration);
+            }
+
+            // Lifecycle check: Can we survive another trip + 100 ticks for searching?
+            if (creep.ticksToLive && creep.memory.fullTripTicks && creep.ticksToLive < creep.memory.fullTripTicks + 100) {
+                creep.memory.recycle = true;
+                creep.say('💀 Retire');
+                return;
+            }
+
             creep.memory.working = true;
+            creep.memory.tripStartTick = Game.time;
             creep.say('🔍 Salvage');
         }
+
+        const salvageContainers = creep.memory.salvageContainers ?? false;
+        const salvageEnergy = creep.memory.salvageEnergy ?? false;
+        const depositHome = creep.memory.depositHome ?? false;
 
         // 2. SALVAGE PHASE
         if (creep.memory.working) {
@@ -20,62 +64,124 @@ export const roleSalvager: RoleHandler = {
                 return;
             }
 
-            // FIND TARGETS WITH PRIORITY
-            // 1. Dropped Resources
-            const dropped = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES);
-
-            // 2. Tombstones
-            const tombstone = !dropped ? creep.pos.findClosestByRange(FIND_TOMBSTONES, { filter: (t) => t.store.getUsedCapacity() > 0 }) : null;
-
-            // 3. Ruins
-            const ruin = (!dropped && !tombstone) ? creep.pos.findClosestByRange(FIND_RUINS, { filter: (r) => r.store.getUsedCapacity() > 0 }) : null;
-
-            // 4. Hostile/Leftover Structures (Storage, Terminal, Factory, Containers)
-            let hostileStore: AnyStoreStructure | null = null;
-            if (!dropped && !tombstone && !ruin) {
-                const hostileStructures = creep.room.find(FIND_STRUCTURES, {
-                    filter: (s) => {
-                        const type = s.structureType;
-                        // Owned structures
-                        if (type === STRUCTURE_STORAGE || type === STRUCTURE_TERMINAL || type === STRUCTURE_FACTORY) {
-                            return !s.my && s.store.getUsedCapacity() > 0;
-                        }
-                        // Neutral structures (Containers) - Only loot if NOT in home room AND room is not owned
-                        if (type === STRUCTURE_CONTAINER) {
-                            const isMyRoom = creep.room.controller && creep.room.controller.my;
-                            return !isMyRoom && creep.room.name !== creep.memory.homeRoom && s.store.getUsedCapacity() > 0;
-                        }
-                        return false;
-                    }
-                }) as AnyStoreStructure[];
-                hostileStore = hostileStructures[0] || null;
+            // --- TARGET FIXATION ---
+            let target = Game.getObjectById(creep.memory.targetId as Id<any>);
+            if (target) {
+                const hasResources = ('store' in target) ? (
+                    salvageEnergy ? target.store.getUsedCapacity() > 0 : (target.store.getUsedCapacity() - target.store.getUsedCapacity(RESOURCE_ENERGY) > 0)
+                ) : ('amount' in target) ? target.amount > 0 : false;
+                
+                if (!hasResources) {
+                    delete creep.memory.targetId;
+                    target = null;
+                }
             }
 
-            const target = dropped || tombstone || ruin || hostileStore;
+            if (!target) {
+                // FIND TARGETS WITH NEW PRIORITY
+                // 1. Dropped Resources, Tombstones, Ruins
+                target = creep.pos.findClosestByRange(FIND_DROPPED_RESOURCES, {
+                    filter: (r: Resource) => {
+                        if (!salvageEnergy && r.resourceType === RESOURCE_ENERGY) return false;
+                        const isNearSource = r.pos.findInRange(FIND_SOURCES, 2).length > 0;
+                        return isNearSource ? r.amount > 400 : r.amount > 50;
+                    }
+                }) || creep.pos.findClosestByRange(FIND_TOMBSTONES, { 
+                    filter: (t: Tombstone) => {
+                        if (!salvageEnergy && t.store.getUsedCapacity() === t.store.getUsedCapacity(RESOURCE_ENERGY)) return false;
+                        return t.store.getUsedCapacity() > 100;
+                    }
+                }) || creep.pos.findClosestByRange(FIND_RUINS, { 
+                    filter: (r: Ruin) => {
+                        if (!salvageEnergy && r.store.getUsedCapacity() === r.store.getUsedCapacity(RESOURCE_ENERGY)) return false;
+                        return r.store.getUsedCapacity() > 100;
+                    }
+                });
+
+                // 2. Containers (if enabled)
+                if (!target && salvageContainers) {
+                    const containers = creep.room.find(FIND_STRUCTURES, {
+                        filter: (s) => s.structureType === STRUCTURE_CONTAINER && s.store.getUsedCapacity() > 0
+                    }) as StructureContainer[];
+                    
+                    if (containers.length > 0) {
+                        // Prioritize those NOT within 2 spaces of source or controller
+                        const priorityContainers = containers.filter(c => {
+                            const nearSource = c.pos.findInRange(FIND_SOURCES, 2).length > 0;
+                            const nearController = creep.room.controller && c.pos.findInRange([creep.room.controller], 2).length > 0;
+                            return !nearSource && !nearController;
+                        });
+                        
+                        target = priorityContainers.length > 0 ? creep.pos.findClosestByRange(priorityContainers) : creep.pos.findClosestByRange(containers);
+                    }
+                }
+
+                // 3. Enemy Structures (Terminal then Storage)
+                if (!target) {
+                    const findEnemyStore = (type: STRUCTURE_TERMINAL | STRUCTURE_STORAGE) => {
+                        return creep.room.find(FIND_HOSTILE_STRUCTURES, {
+                            filter: (s) => s.structureType === type && (
+                                salvageEnergy ? s.store.getUsedCapacity() > 0 : (s.store.getUsedCapacity() - s.store.getUsedCapacity(RESOURCE_ENERGY) > 0)
+                            )
+                        })[0] as AnyStoreStructure;
+                    };
+
+                    target = findEnemyStore(STRUCTURE_TERMINAL) || findEnemyStore(STRUCTURE_STORAGE);
+                }
+
+                if (target) creep.memory.targetId = target.id;
+            }
 
             if (target) {
                 if (creep.pos.getRangeTo(target) > 1) {
                     creep.moveTo(target, { visualizePathStyle: { stroke: '#ff0000' }, reusePath: 5 });
                 } else {
-                    if (dropped && creep.pos.isNearTo(dropped)) {
-                        creep.pickup(dropped);
-                    }
-                    else if ('store' in target) {
-                        // Withdraw any resource found in the store
-                        for (const res in (target as any).store) {
-                            if ((target as any).store[res] > 0) {
-                                creep.withdraw(target as AnyStoreStructure, res as ResourceConstant);
-                                break;
+                    // --- INTERACTION ---
+                    if (target instanceof Resource) {
+                        creep.pickup(target);
+                    } else if ('store' in target) {
+                        // Resource Priority: Power -> Specials -> Energy (if allowed)
+                        let resToWithdraw: ResourceConstant | undefined;
+                        
+                        if (target.store.getUsedCapacity(RESOURCE_POWER) > 0) {
+                            resToWithdraw = RESOURCE_POWER;
+                        } else {
+                            const specials = Object.keys(target.store).filter(r => r !== RESOURCE_ENERGY && r !== RESOURCE_POWER && target.store[r as ResourceConstant] > 0) as ResourceConstant[];
+                            if (specials.length > 0) {
+                                resToWithdraw = specials[0];
+                            } else if (salvageEnergy && target.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                                resToWithdraw = RESOURCE_ENERGY;
                             }
+                        }
+
+                        if (resToWithdraw) {
+                            creep.withdraw(target as AnyStoreStructure, resToWithdraw);
+                        } else {
+                            // Target is actually empty of what we want
+                            delete creep.memory.targetId;
+                        }
+                    }
+
+                    // --- POST-INTERACTION: Move on if area is empty ---
+                    if (creep.store.getUsedCapacity() > 0) {
+                        const moreNearby = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 5, { 
+                            filter: (r: Resource) => r.amount > 100
+                        }).length > 0 || (
+                            'store' in target && target.store.getUsedCapacity() > 100
+                        );
+                        
+                        if (!moreNearby) {
+                            delete creep.memory.targetId;
+                            // Go deposit if no easy targets nearby
+                            creep.memory.working = false;
                         }
                     }
                 }
             } else {
-                // Room is clean! If we have anything, go deposit it.
+                // Room is clean!
                 if (creep.store.getUsedCapacity() > 0) {
                     creep.memory.working = false;
                 } else {
-                    // Nothing to do and empty.
                     const spawn = creep.pos.findClosestByRange(FIND_MY_SPAWNS);
                     if (spawn) {
                         if (spawn.recycleCreep(creep) === ERR_NOT_IN_RANGE) {
@@ -90,7 +196,15 @@ export const roleSalvager: RoleHandler = {
 
         // 3. DEPOSIT PHASE
         else {
-            // First, try to find a storage in the CURRENT room that belongs to me
+            const homeRoom = creep.memory.homeRoom;
+
+            // If depositHome is true and we aren't home, move home first
+            if (depositHome && homeRoom && creep.room.name !== homeRoom) {
+                creep.moveTo(new RoomPosition(25, 25, homeRoom), { range: 10, visualizePathStyle: { stroke: '#ffffff' } });
+                return;
+            }
+
+            // Try to find a storage in the CURRENT room that belongs to me
             const currentStorage = creep.room.storage;
 
             if (currentStorage && currentStorage.my) {
@@ -105,7 +219,6 @@ export const roleSalvager: RoleHandler = {
                 }
             } else {
                 // No storage in this room, head back to Home Room
-                const homeRoom = creep.memory.homeRoom;
                 if (homeRoom && creep.room.name !== homeRoom) {
                     creep.moveTo(new RoomPosition(25, 25, homeRoom), { range: 10, visualizePathStyle: { stroke: '#ffffff' } });
                 } else {

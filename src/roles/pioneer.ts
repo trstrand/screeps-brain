@@ -1,4 +1,4 @@
-import { COLONY_SETTINGS } from '../config.creeps';
+import { COLONY_SETTINGS } from '../config/settings';
 
 export const rolePioneer: RoleHandler = {
     run(creep: Creep): void {
@@ -15,10 +15,42 @@ export const rolePioneer: RoleHandler = {
         }
 
         // --- 0. BORDER SAFETY ---
+        // If we are on an edge, we need to move into the room to avoid bouncing
         if (creep.pos.x === 0 || creep.pos.x === 49 || creep.pos.y === 0 || creep.pos.y === 49) {
-            creep.moveTo(new RoomPosition(25, 25, creep.room.name));
-            creep.say('🚧 Edge Fix');
-            return;
+            const xDir = creep.pos.x === 0 ? 1 : (creep.pos.x === 49 ? -1 : 0);
+            const yDir = creep.pos.y === 0 ? 1 : (creep.pos.y === 49 ? -1 : 0);
+            creep.move(
+                (xDir === 1 && yDir === 1) ? BOTTOM_RIGHT :
+                (xDir === 1 && yDir === -1) ? TOP_RIGHT :
+                (xDir === -1 && yDir === 1) ? BOTTOM_LEFT :
+                (xDir === -1 && yDir === -1) ? TOP_LEFT :
+                (xDir === 1) ? RIGHT :
+                (xDir === -1) ? LEFT :
+                (yDir === 1) ? BOTTOM : TOP
+            );
+            creep.say('🚧 Step In');
+            // We don't return here anymore; we allow the rest of the logic to run
+            // but we've already issued a move command to get off the edge.
+        }
+
+        // --- STUCK DETECTION ---
+        if (creep.memory.targetId) {
+            const lastPos = creep.memory.lastPos;
+            if (lastPos && lastPos.x === creep.pos.x && lastPos.y === creep.pos.y && lastPos.roomName === creep.room.name) {
+                creep.memory.stuckCount = (creep.memory.stuckCount || 0) + 1;
+            } else {
+                creep.memory.stuckCount = 0;
+            }
+            creep.memory.lastPos = { x: creep.pos.x, y: creep.pos.y, roomName: creep.room.name };
+
+            if ((creep.memory.stuckCount || 0) > 10) { // Slightly higher for pioneers as they travel more
+                delete creep.memory.targetId;
+                creep.memory.stuckCount = 0;
+                creep.say('🔄 Stuck!');
+            }
+        } else {
+            delete creep.memory.lastPos;
+            creep.memory.stuckCount = 0;
         }
 
         // --- 1. STATE MACHINE ---
@@ -48,8 +80,9 @@ export const rolePioneer: RoleHandler = {
         if (creep.memory.working) {
             if (creep.room.name !== targetRoom) {
                 creep.moveTo(new RoomPosition(25, 25, targetRoom), { 
-                    visualizePathStyle: { stroke: '#ffffff' },
-                    reusePath: 50 
+                    visualizePathStyle: { stroke: '#ffffff', lineStyle: 'dashed' },
+                    reusePath: 50,
+                    maxRooms: 10 // Allow long-distance pathing
                 });
                 creep.say('🛰️ Traveling');
                 return; 
@@ -68,9 +101,12 @@ export const rolePioneer: RoleHandler = {
 
         // If we are not in Home or Target room, we should probably be moving towards one of them
         // unless we found energy in the current room.
-        if (creep.room.name !== homeRoom && creep.room.name !== targetRoom) {
+        if (homeRoom && creep.room.name !== homeRoom && creep.room.name !== targetRoom) {
             // Priority: Get to HomeRoom to refill if we are empty and in transit
-            creep.moveTo(new RoomPosition(25, 25, homeRoom!), { visualizePathStyle: { stroke: '#ffaa00' } });
+            creep.moveTo(new RoomPosition(25, 25, homeRoom), { 
+                visualizePathStyle: { stroke: '#ffaa00', lineStyle: 'dotted' },
+                reusePath: 50
+            });
             creep.say('🛰️ To Home');
             return;
         }
@@ -92,7 +128,7 @@ export const rolePioneer: RoleHandler = {
         if (!target) {
             // --- PRIORITY 0: DISMANTLE PREVIOUS PLAYER EXTENSIONS (Manual Flag) ---
             if (creep.memory.dismantleExtensions && creep.room.name === targetRoom) {
-                target = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+                target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
                     filter: (s) => s.structureType === STRUCTURE_EXTENSION && !((s as any).my)
                 });
                 if (target) {
@@ -114,19 +150,25 @@ export const rolePioneer: RoleHandler = {
 
             // --- PRIORITY 2: DROPPED ENERGY / LOOT ---
             if (!target) {
-                target = creep.pos.findClosestByPath(FIND_DROPPED_RESOURCES, {
+                const dropped = creep.room.find(FIND_DROPPED_RESOURCES, {
                     filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 50
-                }) || creep.pos.findClosestByPath(FIND_TOMBSTONES, {
-                    filter: t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0
-                }) || creep.pos.findClosestByPath(FIND_RUINS, {
+                });
+                const tombstones = creep.room.find(FIND_TOMBSTONES, {
+                    filter: t => t.store[RESOURCE_ENERGY] > 0
+                });
+                const ruins = creep.room.find(FIND_RUINS, {
                     filter: r => r.store.getUsedCapacity(RESOURCE_ENERGY) > 0
                 });
+
+                const allLoot = [...dropped, ...tombstones, ...ruins];
+                target = creep.pos.findClosestByRange(allLoot);
+                
                 if (target) creep.memory.targetId = target.id;
             }
 
             // --- PRIORITY 3: STORAGE/CONTAINERS ---
             if (!target) {
-                target = creep.pos.findClosestByPath(FIND_STRUCTURES, {
+                target = creep.pos.findClosestByRange(FIND_STRUCTURES, {
                     filter: (s) => (s.structureType === STRUCTURE_CONTAINER || 
                                 (s.structureType === STRUCTURE_STORAGE && (s as StructureStorage).my)) &&
                                 s.store.getUsedCapacity(RESOURCE_ENERGY) > 200
@@ -136,7 +178,7 @@ export const rolePioneer: RoleHandler = {
 
             // --- PRIORITY 4: HARVEST ---
             if (!target) {
-                target = creep.pos.findClosestByPath(FIND_SOURCES_ACTIVE, {
+                target = creep.pos.findClosestByRange(FIND_SOURCES_ACTIVE, {
                     filter: (s) => !COLONY_SETTINGS.ignoredSources.includes(s.id as any)
                 });
                 if (target) creep.memory.targetId = target.id;
@@ -146,8 +188,8 @@ export const rolePioneer: RoleHandler = {
         // --- EXECUTION ---
         if (target) {
             let result;
-            if ('structureType' in target) {
-                // It's a structure (Container/Storage/Dismantle target)
+            if ('hits' in target && 'structureType' in target) {
+                // It's a REAL structure (Container/Storage/Dismantle target)
                 if (target.structureType === STRUCTURE_CONTAINER || target.structureType === STRUCTURE_STORAGE) {
                     result = creep.withdraw(target, RESOURCE_ENERGY);
                 } else if (target.structureType === STRUCTURE_SPAWN && (target as any).my) {
@@ -164,7 +206,7 @@ export const rolePioneer: RoleHandler = {
                 // It's a source
                 result = creep.harvest(target);
             } else if ('store' in target) {
-                // Tombstone or Ruin
+                // Tombstone or Ruin (no 'hits' property)
                 result = creep.withdraw(target, RESOURCE_ENERGY);
             }
 
@@ -198,7 +240,7 @@ export const rolePioneer: RoleHandler = {
 
         if (!target) {
             // A. Recharge Spawn/Extensions
-            target = creep.pos.findClosestByPath(FIND_MY_STRUCTURES, {
+            target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
                 filter: (s) => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION) &&
                                 s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
             });
@@ -213,7 +255,7 @@ export const rolePioneer: RoleHandler = {
 
             // C. Construction
             if (!target) {
-                target = creep.pos.findClosestByPath(FIND_CONSTRUCTION_SITES);
+                target = creep.pos.findClosestByRange(FIND_CONSTRUCTION_SITES);
             }
 
             // D. Standard Upgrade

@@ -17,18 +17,49 @@ export const roleDefender: RoleHandler = {
         }
 
         // 2. Find Hostile Targets
+        const attackHealer = creep.memory.attackHealer ?? false;
         let target = Game.getObjectById(creep.memory.targetId as Id<Creep>);
 
-        if (!target || target.room.name !== creep.room.name) {
+        // Re-evaluate target if:
+        // - We don't have one
+        // - It's in a different room
+        // - It's dead
+        // - OR attackHealer is on and a healer is now present
+        let shouldReevaluate = !target || target.room.name !== creep.room.name;
+        
+        if (!shouldReevaluate && attackHealer && target && target.getActiveBodyparts(HEAL) <= 1) {
+            const hasHealers = creep.room.find(FIND_HOSTILE_CREEPS, { 
+                filter: h => h.getActiveBodyparts(HEAL) > 1 
+            }).length > 0;
+            if (hasHealers) shouldReevaluate = true;
+        }
+
+        if (shouldReevaluate) {
             const hostiles = creep.room.find(FIND_HOSTILE_CREEPS);
             
             if (hostiles.length > 0) {
-                // Priority: Find hostiles with offensive parts first
-                const armedHostiles = hostiles.filter(h => 
-                    h.getActiveBodyparts(ATTACK) > 0 || h.getActiveBodyparts(RANGED_ATTACK) > 0
-                );
+                if (attackHealer) {
+                    // Priority Target Selection:
+                    // 1. Healers (Multiple HEAL parts) - These negate our damage and must die first
+                    const healers = hostiles.filter(h => h.getActiveBodyparts(HEAL) > 1);
+                    
+                    // 2. Armed Hostiles (ATTACK or RANGED_ATTACK)
+                    const armedHostiles = hostiles.filter(h => 
+                        h.getActiveBodyparts(ATTACK) > 0 || h.getActiveBodyparts(RANGED_ATTACK) > 0
+                    );
 
-                target = creep.pos.findClosestByRange(armedHostiles.length > 0 ? armedHostiles : hostiles);
+                    if (healers.length > 0) {
+                        target = creep.pos.findClosestByRange(healers);
+                    } else if (armedHostiles.length > 0) {
+                        target = creep.pos.findClosestByRange(armedHostiles);
+                    } else {
+                        target = creep.pos.findClosestByRange(hostiles);
+                    }
+                } else {
+                    // Just find the closest hostile creep
+                    target = creep.pos.findClosestByRange(hostiles);
+                }
+
                 if (target) creep.memory.targetId = target.id;
             }
         }

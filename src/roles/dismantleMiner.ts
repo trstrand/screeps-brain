@@ -1,4 +1,4 @@
-import { COLONY_SETTINGS } from '../config.creeps';
+import { COLONY_SETTINGS } from '../config/settings';
 
 export const roleDismantleMiner: RoleHandler = {
     run(creep: Creep): void {

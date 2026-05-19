@@ -2,39 +2,41 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Use vi.hoisted to ensure these globals are defined BEFORE any imports are processed
 vi.hoisted(() => {
-    (global as any).OK = 0;
-    (global as any).ERR_NOT_ENOUGH_ENERGY = -6;
-    (global as any).FIND_MY_SPAWNS = 1;
-    (global as any).FIND_HOSTILE_CREEPS = 103;
-    (global as any).FIND_SOURCES = 112;
-    (global as any).FIND_STRUCTURES = 101;
-    (global as any).FIND_MY_STRUCTURES = 102;
-    (global as any).FIND_MINERALS = 116;
-    (global as any).FIND_CONSTRUCTION_SITES = 111;
-    (global as any).STRUCTURE_CONTAINER = 'container';
-    (global as any).STRUCTURE_STORAGE = 'storage';
-    (global as any).STRUCTURE_SPAWN = 'spawn';
-    (global as any).STRUCTURE_EXTENSION = 'extension';
-    (global as any).STRUCTURE_TOWER = 'tower';
-    (global as any).STRUCTURE_WALL = 'wall';
-    (global as any).STRUCTURE_RAMPART = 'rampart';
-    (global as any).STRUCTURE_ROAD = 'road';
-    (global as any).STRUCTURE_EXTRACTOR = 'extractor';
-    (global as any).STRUCTURE_CONTROLLER = 'controller';
-    (global as any).RESOURCE_ENERGY = 'energy';
+    (globalThis as any).OK = 0;
+    (globalThis as any).ERR_NOT_ENOUGH_ENERGY = -6;
+    (globalThis as any).FIND_MY_SPAWNS = 1;
+    (globalThis as any).FIND_HOSTILE_CREEPS = 103;
+    (globalThis as any).FIND_SOURCES = 112;
+    (globalThis as any).FIND_STRUCTURES = 101;
+    (globalThis as any).FIND_MY_STRUCTURES = 102;
+    (globalThis as any).FIND_MINERALS = 116;
+    (globalThis as any).FIND_CONSTRUCTION_SITES = 111;
+    (globalThis as any).STRUCTURE_CONTAINER = 'container';
+    (globalThis as any).STRUCTURE_STORAGE = 'storage';
+    (globalThis as any).STRUCTURE_SPAWN = 'spawn';
+    (globalThis as any).STRUCTURE_EXTENSION = 'extension';
+    (globalThis as any).STRUCTURE_TOWER = 'tower';
+    (globalThis as any).STRUCTURE_WALL = 'wall';
+    (globalThis as any).STRUCTURE_RAMPART = 'rampart';
+    (globalThis as any).STRUCTURE_ROAD = 'road';
+    (globalThis as any).STRUCTURE_EXTRACTOR = 'extractor';
+    (globalThis as any).STRUCTURE_CONTROLLER = 'controller';
+    (globalThis as any).RESOURCE_ENERGY = 'energy';
+    (globalThis as any).RESOURCE_POWER = 'power';
+    (globalThis as any).RESOURCE_OPS = 'ops';
 
-    (global as any).MOVE = 'move';
-    (global as any).WORK = 'work';
-    (global as any).CARRY = 'carry';
-    (global as any).ATTACK = 'attack';
-    (global as any).RANGED_ATTACK = 'ranged_attack';
-    (global as any).HEAL = 'heal';
-    (global as any).TOUGH = 'tough';
-    (global as any).CLAIM = 'claim';
+    (globalThis as any).MOVE = 'move';
+    (globalThis as any).WORK = 'work';
+    (globalThis as any).CARRY = 'carry';
+    (globalThis as any).ATTACK = 'attack';
+    (globalThis as any).RANGED_ATTACK = 'ranged_attack';
+    (globalThis as any).HEAL = 'heal';
+    (globalThis as any).TOUGH = 'tough';
+    (globalThis as any).CLAIM = 'claim';
 });
 
 import { SpawnManager } from '../src/managers/SpawnManager';
-import { COLONY_SETTINGS } from '../src/config.creeps';
+import { COLONY_SETTINGS } from '../src/config/settings';
 
 // Mocking Screeps Globals
 const mockSpawn = {
@@ -58,7 +60,7 @@ const mockRoom = {
 };
 
 // Mock Game object
-(global as any).Game = {
+(globalThis as any).Game = {
     creeps: {},
     time: 100,
     spawns: { 'Spawn1': mockSpawn },
@@ -127,7 +129,7 @@ describe('SpawnManager', () => {
         const minerCall = mockSpawn.spawnCreep.mock.calls.find(call => call[1].startsWith('miner'));
         
         expect(minerCall).toBeDefined();
-        expect(minerCall[2].memory).toMatchObject({
+        expect(minerCall![2].memory).toMatchObject({
             role: 'miner',
             sourceIndex: 1
         });

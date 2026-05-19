@@ -1,4 +1,6 @@
-import { CREEP_CONFIGS, COLONY_SETTINGS } from '../config.creeps';
+import { COLONY_SETTINGS } from '../config/settings';
+import { CREEP_CONFIGS } from '../config/bodies';
+
 
 const SPAWN_PRIORITY: string[] = [
     'miner',
@@ -8,12 +10,14 @@ const SPAWN_PRIORITY: string[] = [
     'repairer',
     'builder',
     'upgradeHauler',
+    'marketHauler',
     'extractorMiner',
     'salvager',
     'transferHauler',
     'remoteMiner',
     'remoteHauler',
     'remoteExtractorMiner',
+    'remoteRepairer',
     'pioneer',
     'expedition',
     'vanguard',
@@ -25,11 +29,12 @@ const SPAWN_PRIORITY: string[] = [
 export class SpawnManager {
     static getBody(roleName: string, cap: number): BodyPartConstant[] {
         const config = CREEP_CONFIGS[roleName];
-        if (!config) return []; 
-        if (config.standard) return config.standard;
-        if (cap >= 1000 && config.industrial) return config.industrial;
-        if (cap >= 550 && config.established) return config.established;
-        return config.starter || [];
+        if (!config) return [];
+        if (cap >= 1800 && config.apex) return config.apex;
+        if (cap >= 1500 && config.citadel) return config.citadel;
+        if (cap >= 1000 && config.bastion) return config.bastion;
+        if (cap >= 550 && config.sentinel) return config.sentinel;
+        return config.vanguard || [];
     }
 
     static run(room: Room) {
@@ -39,28 +44,42 @@ export class SpawnManager {
         const energyCap = room.energyCapacityAvailable;
         const baseMem = { homeRoom: room.name, working: false, recycle: false };
         const quotas = COLONY_SETTINGS.roomQuotas[room.name] || {};
-        
-        const localCreeps = Object.values(Game.creeps).filter(c => c.memory.homeRoom === room.name);
-        const miners = localCreeps.filter(c => c.memory.role === 'miner').length;
-        const haulers = localCreeps.filter(c => c.memory.role === 'hauler').length;
-        
+
+        const allCreeps = Object.values(Game.creeps);
+        const localCreeps = allCreeps.filter(c => c.memory.homeRoom === room.name);
+
+        // OPTIMIZATION: Group local creeps by role once per tick instead of filtering in loops
+        const localRoleCounts: Record<string, number> = {};
+        for (const c of localCreeps) {
+            localRoleCounts[c.memory.role] = (localRoleCounts[c.memory.role] || 0) + 1;
+        }
+
+        const miners = localRoleCounts['miner'] || 0;
+        const haulers = localRoleCounts['hauler'] || 0;
+
         // Emergency recovery uses available energy
         const bodyEnergy = (miners === 0 || haulers === 0) ? room.energyAvailable : energyCap;
 
-        // 1. TOP PRIORITY: Defender (if hostiles present)
+        // 1. TOP PRIORITY: Defender
+        const defenderQuota = (quotas as any)['defender'] || 0;
+        const defenders = localRoleCounts['defender'] || 0;
         const hostiles = room.find(FIND_HOSTILE_CREEPS);
-        const defenders = localCreeps.filter(c => c.memory.role === 'defender').length;
-        if (hostiles.length > 0 && defenders === 0) {
+
+        // Spawn if quota isn't met OR if hostiles are present and we have no defender
+        if (defenders < defenderQuota || (hostiles.length > 0 && defenders === 0)) {
             const body = this.getBody('defender', bodyEnergy);
-            if (spawn.spawnCreep(body, `defender_${Game.time}`, { memory: { ...baseMem, role: 'defender' } }) === OK) return;
+            const result = spawn.spawnCreep(body, `defender_${Game.time}`, { memory: { ...baseMem, role: 'defender' } });
+            if (result === OK) return;
+            // If we are under quota or under attack, we wait for the energy to spawn the defender
+            if (result === ERR_NOT_ENOUGH_ENERGY) return; 
         }
 
         // 2. CRITICAL ROLES: First One (Priority Order: miner, hauler, upgrader)
         const criticalRoles = ['miner', 'hauler', 'upgrader'];
         for (const role of criticalRoles) {
-            const count = localCreeps.filter(c => c.memory.role === role).length;
+            const count = localRoleCounts[role] || 0;
             const quota = (quotas as any)[role] || 0;
-            
+
             if (count === 0 && quota > 0) {
                 let memory: any = { ...baseMem, role };
                 if (role === 'miner') {
@@ -74,8 +93,8 @@ export class SpawnManager {
 
         // 3. FILL QUOTAS: (Priority Order as requested)
         for (const role of SPAWN_PRIORITY) {
-            const isRemoteRole = role === 'remoteMiner' || role === 'remoteHauler' || role === 'remoteExtractorMiner';
-            
+            const isRemoteRole = role === 'remoteMiner' || role === 'remoteHauler' || role === 'remoteExtractorMiner' || role === 'remoteRepairer';
+
             // --- EXPEDITION MULTI-TARGET LOGIC ---
             if (role === 'expedition') {
                 const targetCount = (quotas as any)[role] || 0;
@@ -92,7 +111,7 @@ export class SpawnManager {
                     const cooldown = 900;
                     const canSpawn = (Game.time - lastSpawn) >= cooldown;
 
-                    const existing = Object.values(Game.creeps).find(c => 
+                    const existing = allCreeps.find(c =>
                         c.memory.role === 'expedition' && c.memory.targetRoom === targetRoomName
                     );
 
@@ -100,7 +119,7 @@ export class SpawnManager {
                         let memory: any = { ...baseMem, role, targetRoom: targetRoomName };
                         const body = this.getBody(role, bodyEnergy);
                         const result = spawn.spawnCreep(body, `${role}_${targetRoomName}_${Game.time}`, { memory });
-                        
+
                         if (result === OK) {
                             Memory.lastExpeditionSpawn[targetRoomName] = Game.time;
                             console.log(`🚀 [Spawn] Room ${room.name} launching expedition to ${targetRoomName}`);
@@ -115,20 +134,32 @@ export class SpawnManager {
             }
 
             if (isRemoteRole) {
-                const remoteRooms = COLONY_SETTINGS.remoteMining[room.name] || [];
+                const isActualRemoteMiningRole = role === 'remoteMiner' || role === 'remoteHauler' || role === 'remoteExtractorMiner';
+                
+                // If it's a remote mining role, check remoteMining settings. 
+                // If it's a remote repairer, we might want to check remoteMining settings as well to see where we need roads repaired.
+                const remoteRooms = [...(COLONY_SETTINGS.remoteMining[room.name] || [])];
+                
+                // Also include the remoteBuild room if it exists and we are a remoteRepairer
+                if (role === 'remoteRepairer' && COLONY_SETTINGS.remoteBuild && !remoteRooms.includes(COLONY_SETTINGS.remoteBuild)) {
+                    remoteRooms.push(COLONY_SETTINGS.remoteBuild);
+                }
+
                 for (const remoteRoomName of remoteRooms) {
                     const remoteQuotas = COLONY_SETTINGS.roomQuotas[remoteRoomName] || {};
                     const targetCount = (remoteQuotas as any)[role] || 0;
-                    const roleCount = Object.values(Game.creeps).filter(c => 
-                        c.memory.role === role && 
-                        c.memory.targetRoom === remoteRoomName &&
-                        c.memory.homeRoom === room.name
+                    const roleCount = allCreeps.filter(c =>
+                        c.memory.role === role &&
+                        c.memory.targetRoom === remoteRoomName
                     ).length;
 
                     if (roleCount < targetCount) {
                         let memory: any = { ...baseMem, role, targetRoom: remoteRoomName };
                         if (role === 'remoteMiner') {
-                            const roomCreeps = Object.values(Game.creeps).filter(c => c.memory.targetRoom === remoteRoomName && c.memory.role === role);
+                            const roomCreeps = allCreeps.filter(c => 
+                                c.memory.targetRoom === remoteRoomName && 
+                                c.memory.role === role
+                            );
                             const assignedIndices = roomCreeps.map(c => c.memory.sourceIndex ?? -1);
                             memory.sourceIndex = [0, 1].find(i => !assignedIndices.includes(i)) ?? 0;
                         }
@@ -141,22 +172,22 @@ export class SpawnManager {
             }
 
             // Local Role Filling
-            const roleCount = localCreeps.filter(c => c.memory.role === role).length;
+            const roleCount = localRoleCounts[role] || 0;
             let targetCount = (quotas as any)[role] || 0;
 
             // Skip if special conditions aren't met
-            if (role === 'builder' && room.find(FIND_CONSTRUCTION_SITES).length === 0) targetCount = 0;
-            if (role === 'upgradeHauler') {
+            if (role === 'builder' && targetCount > 0 && room.find(FIND_CONSTRUCTION_SITES).length === 0) targetCount = 0;
+            if (role === 'upgradeHauler' && targetCount > 0) {
                 const controller = room.controller;
-                const containerNearController = controller ? controller.pos.findInRange(FIND_STRUCTURES, 4, {
+                const containerNearController = controller ? controller.pos.findInRange(FIND_STRUCTURES, 1, {
                     filter: s => s.structureType === STRUCTURE_CONTAINER
                 }).length > 0 : false;
                 if (!containerNearController) targetCount = 0;
             }
-            if (role === 'extractorMiner') {
+            if (role === 'extractorMiner' && targetCount > 0) {
                 const hasExtractor = room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTRACTOR } }).length > 0;
                 if (!hasExtractor) targetCount = 0;
-                
+
                 const mineral = room.find(FIND_MINERALS)[0];
                 const quota = COLONY_SETTINGS.mineralQuotas[room.name];
                 if (mineral && quota !== undefined && room.storage) {
@@ -164,10 +195,30 @@ export class SpawnManager {
                     if (currentStock >= quota) targetCount = 0;
                 }
             }
+            if (role === 'marketHauler' && targetCount > 0) {
+                const hasExtractor = room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTRACTOR } }).length > 0;
+                const mineral = room.find(FIND_MINERALS)[0];
+                const quota = COLONY_SETTINGS.mineralQuotas[room.name];
+                let needsMinerals = false;
+                if (hasExtractor && mineral && quota !== undefined && room.storage) {
+                    const currentStock = room.storage.store.getUsedCapacity(mineral.mineralType);
+                    if (currentStock < quota) needsMinerals = true;
+                }
+
+                const transfers = (COLONY_SETTINGS.terminalTransfers && COLONY_SETTINGS.terminalTransfers[room.name]) || [];
+                const terminal = room.terminal;
+                const storage = room.storage;
+                let hasPendingTransfers = false;
+                if (terminal && storage && transfers.length > 0) {
+                    hasPendingTransfers = transfers.some(t => (terminal.store[t.resource] || 0) < t.amount && (storage.store[t.resource] || 0) > 0);
+                }
+
+                if (!needsMinerals && !hasPendingTransfers) targetCount = 0;
+            }
 
             if (roleCount < targetCount) {
                 let memory: any = { ...baseMem, role };
-                
+
                 // Specific setup for roles
                 if (role === 'miner') {
                     const allMiners = localCreeps.filter(c => c.memory.role === 'miner');
@@ -175,7 +226,7 @@ export class SpawnManager {
                     memory.working = true;
                     memory.sourceIndex = [0, 1].find(i => !assignedSources.includes(i)) ?? 0;
                 }
-                
+
                 // --- PIONEER TARGETING ---
                 if (role === 'pioneer') {
                     memory.targetRoom = COLONY_SETTINGS.pioneerTarget;
@@ -189,7 +240,17 @@ export class SpawnManager {
 
                 if (role === 'transferHauler') {
                     const transfers = COLONY_SETTINGS.resourceTransfers || [];
-                    const transfer = transfers.find(t => t.sourceRoom === room.name);
+                    const allTransferHaulers = allCreeps.filter(c => c.memory.role === 'transferHauler');
+
+                    const transfer = transfers.find(t => {
+                        const countForThisTransfer = allTransferHaulers.filter(c => 
+                            c.memory.sourceRoom === t.sourceRoom && 
+                            c.memory.destinationRoom === t.destRoom && 
+                            c.memory.transferResource === t.resource
+                        ).length;
+                        return countForThisTransfer < (t.count || 1);
+                    });
+
                     if (transfer) {
                         memory.sourceRoom = transfer.sourceRoom;
                         memory.destinationRoom = transfer.destRoom;
@@ -197,7 +258,12 @@ export class SpawnManager {
                     } else continue;
                 }
                 if (role === 'vanguard') memory.targetRoom = COLONY_SETTINGS.defendRoom;
-                if (role === 'salvager' && COLONY_SETTINGS.salvageRoom) memory.targetRoom = COLONY_SETTINGS.salvageRoom;
+                if (role === 'salvager') {
+                    if (COLONY_SETTINGS.salvageRoom) memory.targetRoom = COLONY_SETTINGS.salvageRoom;
+                    memory.salvageContainers = COLONY_SETTINGS.salvageContainers;
+                    memory.salvageEnergy = COLONY_SETTINGS.salvageEnergy;
+                    memory.depositHome = COLONY_SETTINGS.depositHome;
+                }
                 if (role === 'remoteBuilder' && COLONY_SETTINGS.remoteBuild) memory.targetRoom = COLONY_SETTINGS.remoteBuild;
                 if (role === 'claimer' && COLONY_SETTINGS.claimRoom) memory.targetRoom = COLONY_SETTINGS.claimRoom;
 

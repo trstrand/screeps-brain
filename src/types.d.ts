@@ -11,6 +11,7 @@ declare global {
         dismantleMiner?: number;
         extractorMiner?: number;
         hauler?: number;
+        marketHauler?: number;
         upgradeHauler?: number;
         upgrader?: number;
         builder?: number;
@@ -20,6 +21,7 @@ declare global {
         remoteMiner?: number;
         remoteHauler?: number;
         remoteExtractorMiner?: number;
+        remoteRepairer?: number;
         pioneer?: number;    
         expedition?: number;
         vanguard?: number;
@@ -32,7 +34,7 @@ declare global {
         sourceRoom: string;
         destRoom: string;
         resource: ResourceConstant;
-        count: number;
+        count?: number;
     }
 
     interface ColonySettings {
@@ -41,10 +43,11 @@ declare global {
         breakerTarget: { room: string, id: string };
         defendRoom: string;
         salvageRoom?: string;
+        salvageContainers: boolean;
+        salvageEnergy: boolean;
+        depositHome: boolean;
         remoteBuild?: string;
         claimRoom?: string;
-        wallMaxHits: number;
-        rampartMaxHits: number;
         roomWallMaxHits?: { [roomName: string]: number };
         roomRampartMaxHits?: { [roomName: string]: number };
         attackWalls: boolean;
@@ -54,6 +57,7 @@ declare global {
         roomQuotas: { [roomName: string]: RoomQuota };
         remoteMining: { [roomName: string]: string[] };
         mineralQuotas: { [roomName: string]: number };
+        terminalTransfers?: { [roomName: string]: { resource: ResourceConstant, amount: number }[] };
         resourceTransfers?: ResourceTransfer[];
         debug: boolean;
     }
@@ -65,21 +69,36 @@ declare global {
         recycle?: boolean;
         targetRoom?: string;
         targetId?: Id<any>;
+        deliveryTargetId?: Id<any>;
         sourceIndex?: number; 
-        targetContainerId?: Id<StructureContainer>;
+        targetContainerId?: Id<StructureContainer | StructureLink>;
         repairTargetId?: Id<Structure>;
         dismantleWork?: boolean;
         dismantleTarget?: Id<any>;
         sourceRoom?: string;
         destinationRoom?: string;
         transferResource?: ResourceConstant;
+        salvageContainers?: boolean;
+        salvageEnergy?: boolean;
+        depositHome?: boolean;
+        attackHealer?: boolean;
+        tripStartTick?: number;
+        fullTripTicks?: number;
         idleTicks?: number;
         dismantleExtensions?: boolean;
+        lastPos?: { x: number, y: number, roomName: string };
+        stuckCount?: number;
     }
 
     interface RoomMemory {
         sourceIds: Id<Source>[];
         dismantleMiningTarget?: Id<Structure>;
+        towerRepairTargetId?: Id<Structure>;
+        sourceLink1?: Id<StructureLink>;
+        sourceLink2?: Id<StructureLink>;
+        controllerLink?: Id<StructureLink>;
+        storageLink?: Id<StructureLink>;
+        linkCheckDone?: boolean;
     }
 
     interface RoleHandler {
@@ -88,9 +107,10 @@ declare global {
     }
 
     interface RoleBodyConfig {
-        starter?: BodyPartConstant[];
-        established?: BodyPartConstant[];
-        industrial?: BodyPartConstant[];
-        standard?: BodyPartConstant[];
+        vanguard?: BodyPartConstant[];
+        sentinel?: BodyPartConstant[];
+        bastion?: BodyPartConstant[];
+        citadel?: BodyPartConstant[];
+        apex?: BodyPartConstant[];
     }
 }
