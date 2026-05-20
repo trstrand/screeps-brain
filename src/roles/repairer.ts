@@ -2,6 +2,12 @@ import { COLONY_SETTINGS } from '../config/settings';
 
 export const roleRepairer: RoleHandler = {
     run(creep: Creep): void {
+        // Recycle when ticks to live is below 30
+        if (creep.ticksToLive && creep.ticksToLive < 30) {
+            creep.memory.recycle = true;
+            return;
+        }
+
         // 1. State Toggle
         if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) {
             creep.memory.working = false;

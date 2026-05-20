@@ -106,4 +106,10 @@ describe('Role: Repairer', () => {
         expect(mockCreep.repair).toHaveBeenCalledWith(mockStructure);
         expect(mockCreep.moveTo).toHaveBeenCalledWith(mockStructure, expect.any(Object));
     });
+
+    it('should recycle when ticks to live is below 30', () => {
+        mockCreep.ticksToLive = 29;
+        roleRepairer.run(mockCreep);
+        expect(mockCreep.memory.recycle).toBe(true);
+    });
 });

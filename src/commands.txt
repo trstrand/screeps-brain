@@ -7,3 +7,5 @@ Object.values(Game.creeps)
 Game.cpu.bucket
 
 
+Object.values(Game.rooms).filter(r => r.controller?.my).forEach(r => console.log(`Room: ${r.name} | RCL: ${r.controller.level} | Progress: ${r.controller.progress}/${r.controller.progressTotal} (${((r.controller.progress/r.controller.progressTotal)*100 || 0).toFixed(2)}%) | Storage: ${r.storage ? r.storage.store[RESOURCE_ENERGY].toLocaleString() : 'N/A'}`));
+
