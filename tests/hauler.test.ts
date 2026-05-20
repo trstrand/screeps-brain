@@ -38,7 +38,9 @@ describe('Role: Hauler', () => {
             },
             pos: {
                 findClosestByRange: vi.fn().mockReturnValue(null),
-                getRangeTo: vi.fn().mockReturnValue(5)
+                getRangeTo: vi.fn().mockReturnValue(5),
+                inRangeTo: vi.fn().mockReturnValue(false),
+                findInRange: vi.fn().mockReturnValue([])
             },
             store: {
                 getCapacity: vi.fn().mockReturnValue(50),
@@ -78,6 +80,75 @@ describe('Role: Hauler', () => {
         expect(mockCreep.say).toHaveBeenCalledWith('🔄 Loading');
     });
 
-    // Hauler code is massive (25k bytes), so this is a simplified stub test suite.
-    // Full coverage of hauler would require mocking of its entire decision tree.
+    it('should withdraw from storage to fill towers if towers are below 100% (even if spawns/extensions are full and towers are >= 50%)', () => {
+        mockCreep.memory.working = false;
+        mockCreep.store.getUsedCapacity.mockReturnValue(0);
+        mockCreep.store.getFreeCapacity.mockReturnValue(50);
+        mockCreep.pos.getRangeTo.mockReturnValue(2); // Far enough to call moveTo
+        mockCreep.pos.inRangeTo = vi.fn().mockReturnValue(true); // Always near storage
+
+        mockCreep.room.energyAvailable = 300;
+        mockCreep.room.energyCapacityAvailable = 300;
+        mockCreep.room.storage = {
+            id: 'storage_id',
+            structureType: (globalThis as any).STRUCTURE_STORAGE,
+            store: {
+                [(globalThis as any).RESOURCE_ENERGY]: 1000
+            }
+        };
+
+        const mockTower = {
+            id: 'tower_id',
+            structureType: (globalThis as any).STRUCTURE_TOWER,
+            store: {
+                getUsedCapacity: () => 700,
+                getCapacity: () => 1000,
+                getFreeCapacity: () => 300,
+            }
+        };
+
+        mockCreep.room.find = vi.fn().mockImplementation((type, options) => {
+            if (type === (globalThis as any).FIND_MY_STRUCTURES) {
+                const structures = [mockTower];
+                if (options && options.filter) {
+                    return structures.filter(options.filter);
+                }
+                return structures;
+            }
+            return [];
+        });
+
+        roleHauler.run(mockCreep);
+
+        expect(mockCreep.memory.targetId).toBe('storage_id');
+        expect(mockCreep.moveTo).toHaveBeenCalledWith(mockCreep.room.storage, expect.any(Object));
+    });
+
+    it('should park near spawn if empty and no collection target is found', () => {
+        mockCreep.memory.working = false;
+        mockCreep.store.getUsedCapacity.mockReturnValue(0);
+        mockCreep.store.getFreeCapacity.mockReturnValue(50);
+
+        const mockSpawn = {
+            id: 'spawn_id',
+            pos: {
+                getRangeTo: () => 10
+            }
+        };
+
+        mockCreep.room.find = vi.fn().mockImplementation((type) => {
+            if (type === (globalThis as any).FIND_MY_SPAWNS) {
+                return [mockSpawn];
+            }
+            return [];
+        });
+
+        mockCreep.pos.findClosestByRange.mockReturnValue(mockSpawn);
+        mockCreep.pos.getRangeTo.mockReturnValue(10); // Spawns are far
+
+        roleHauler.run(mockCreep);
+
+        expect(mockCreep.moveTo).toHaveBeenCalledWith(mockSpawn, expect.any(Object));
+        expect(mockCreep.say).toHaveBeenCalledWith('💤 Idle');
+    });
 });

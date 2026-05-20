@@ -173,6 +173,11 @@ export const roleHauler: RoleHandler = {
             if (activeSources.length === 0) activeSources = creep.room.find(FIND_SOURCES);
             const isNearSource = (pos: RoomPosition) => activeSources.some(s => pos.inRangeTo(s, 2));
 
+            const towersNeedEnergy = creep.room.find(FIND_MY_STRUCTURES, {
+                filter: s => s.structureType === STRUCTURE_TOWER &&
+                    s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+            }).length > 0;
+
             if (creep.memory.targetId) {
                 target = Game.getObjectById(creep.memory.targetId as Id<any>);
 
@@ -272,7 +277,7 @@ export const roleHauler: RoleHandler = {
                 // Priority 1.5: Hub Refill (Storage -> Spawns/Extensions)
                 // If near storage and base needs energy, pull from storage now
                 if (!target && creep.room.storage && creep.pos.inRangeTo(creep.room.storage, 5)) {
-                    if (creep.room.storage.store[RESOURCE_ENERGY] > 0 && !this.shuttleCheck(creep.room)) {
+                    if (creep.room.storage.store[RESOURCE_ENERGY] > 0 && (!this.shuttleCheck(creep.room) || towersNeedEnergy)) {
                         target = creep.room.storage;
                     }
                 }
@@ -317,7 +322,7 @@ export const roleHauler: RoleHandler = {
                 // Priority 5: General room.storage fallback
                 // ONLY pull from storage if we actually have a destination that needs it (Spawns/Extensions/Towers)
                 if (!target && creep.room.storage && creep.room.storage.store[RESOURCE_ENERGY] > 0) {
-                    if (!this.shuttleCheck(creep.room)) {
+                    if (!this.shuttleCheck(creep.room) || towersNeedEnergy) {
                         target = creep.room.storage;
                     }
                 }
@@ -423,10 +428,9 @@ export const roleHauler: RoleHandler = {
                     }
                 }
             } else {
-                const isMostlyFull = creep.store.getUsedCapacity(RESOURCE_ENERGY) >= creep.store.getCapacity() * 0.8;
-                const hasMinEnergy = creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 50;
-
                 if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    const isMostlyFull = creep.store.getUsedCapacity(RESOURCE_ENERGY) >= creep.store.getCapacity() * 0.8;
+                    const hasMinEnergy = creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 50;
                     const towersBelow90 = creep.room.find(FIND_MY_STRUCTURES, {
                         filter: s => s.structureType === STRUCTURE_TOWER &&
                             s.store.getUsedCapacity(RESOURCE_ENERGY) < (s.store.getCapacity(RESOURCE_ENERGY) * 0.9)
@@ -445,6 +449,12 @@ export const roleHauler: RoleHandler = {
                         creep.say('💤 Idle');
                         creep.say('⌛ Waiting');
                     }
+                } else {
+                    const parkTarget = creep.pos.findClosestByRange(mySpawns);
+                    if (parkTarget && creep.pos.getRangeTo(parkTarget) > 5) {
+                        creep.moveTo(parkTarget, { range: 5, visualizePathStyle: { stroke: '#ffaa00' } });
+                    }
+                    creep.say('💤 Idle');
                 }
             }
         }

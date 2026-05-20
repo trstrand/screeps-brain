@@ -17,23 +17,28 @@ export const COLONY_SETTINGS: ColonySettings = {
     attackWalls: false,
     attackRamparts: false,
     //wall and rampart repair settings
-    roomWallMaxHits: {
-        "E55S58": 1e5,
-        "E59S58": 1e4,
-        "E58S58": 1e4,
-        "E58S57": 1e4,
-        "E57S57": 1e4,
-
-        "E59S55": 1e4
-    },
-    roomRampartMaxHits: {
-        "E55S58": 1e5,
-        "E59S58": 1e4,
-        "E58S58": 1e4,
-        "E58S57": 1e4,
-        "E57S57": 1e4,
-        "E59S55": 1e4
-    },
+	roomWallMaxHits: {
+		"E55S58": 1e5,
+		"E57S56": 1e3,
+		"E57S57": 2e5,
+		"E58S56": 1e3,
+		"E58S57": 2e5,
+		"E58S58": 2e5,
+		"E58S59": 1e3,
+		"E59S55": 1e5,
+		"E59S58": 3e5
+	},
+	roomRampartMaxHits: {
+		"E55S58": 1e5,
+		"E57S56": 1e3,
+		"E57S57": 2e5,
+		"E58S56": 1e3,
+		"E58S57": 1e5,
+		"E58S58": 2e5,
+		"E58S59": 1e3,
+		"E59S55": 1e5,
+		"E59S58": 3e5
+	},
     remoteMining: {
         'E58S57': ['E58S56', 'E5S56'], // Example: 'HomeRoom': ['RemoteRoom1', 'RemoteRoom2']
     },
