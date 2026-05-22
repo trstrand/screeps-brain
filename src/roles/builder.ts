@@ -1,6 +1,95 @@
 import { COLONY_SETTINGS } from '../config/settings';
 
 /**
+ * Checks if a Source has at least one walkable tile around it that is not blocked by other creeps or structures.
+ */
+function hasFreeMiningSpot(source: Source, creep: Creep): boolean {
+    const room = source.room;
+    if (!room) return false;
+    const terrain = room.getTerrain();
+    
+    for (let dx = -1; dx <= 1; dx++) {
+        for (let dy = -1; dy <= 1; dy++) {
+            if (dx === 0 && dy === 0) continue;
+            const x = source.pos.x + dx;
+            const y = source.pos.y + dy;
+            
+            if (x < 0 || x > 49 || y < 0 || y > 49) continue;
+            
+            if ((terrain.get(x, y) & TERRAIN_MASK_WALL) !== 0) {
+                continue;
+            }
+            
+            const creeps = room.lookForAt(LOOK_CREEPS, x, y);
+            if (creeps.length > 0 && creeps[0].id !== creep.id) {
+                continue;
+            }
+            
+            const structures = room.lookForAt(LOOK_STRUCTURES, x, y);
+            let isBlocked = false;
+            for (const s of structures) {
+                if (s.structureType !== STRUCTURE_ROAD && 
+                    s.structureType !== STRUCTURE_CONTAINER && 
+                    !(s.structureType === STRUCTURE_RAMPART && (s as StructureRampart).my)) {
+                    isBlocked = true;
+                    break;
+                }
+            }
+            
+            if (!isBlocked) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+/**
+ * Finds the closest target in a list that has a valid path to it (ignoring creeps).
+ */
+function findClosestReachable<T extends RoomObject & { pos: RoomPosition }>(creep: Creep, targets: T[]): T | null {
+    let remaining = [...targets];
+    while (remaining.length > 0) {
+        const closest = creep.pos.findClosestByRange(remaining);
+        if (!closest) break;
+
+        const path = creep.room.findPath(creep.pos, closest.pos, { ignoreCreeps: true, maxOps: 200 });
+        const isReachable = path.length > 0 && path[path.length - 1].x === closest.pos.x && path[path.length - 1].y === closest.pos.y;
+        
+        if (isReachable || creep.pos.isNearTo(closest.pos)) {
+            return closest;
+        } else {
+            const index = remaining.indexOf(closest);
+            if (index > -1) remaining.splice(index, 1);
+        }
+    }
+    return null;
+}
+
+/**
+ * Sweeps up nearby energy (dropped resource, tombstone, or ruin) before moving.
+ */
+function moveWithSweeper(creep: Creep, target: RoomPosition | { pos: RoomPosition }, options?: any): number {
+    if (creep.store.getFreeCapacity() > 0) {
+        const vacDrop = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, { filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0 })[0];
+        if (vacDrop) {
+            creep.pickup(vacDrop);
+        } else {
+            const vacTomb = creep.pos.findInRange(FIND_TOMBSTONES, 1, { filter: (t: Tombstone) => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
+            if (vacTomb) {
+                creep.withdraw(vacTomb, RESOURCE_ENERGY);
+            } else {
+                const vacRuin = creep.pos.findInRange(FIND_RUINS, 1, { filter: (r: Ruin) => r.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
+                if (vacRuin) {
+                    creep.withdraw(vacRuin, RESOURCE_ENERGY);
+                }
+            }
+        }
+    }
+    return creep.moveTo(target, options);
+}
+
+/**
  * Builder Role - Optimized for CanMiner setups with Container Maintenance
  */
 export const roleBuilder: RoleHandler = {
@@ -9,7 +98,7 @@ export const roleBuilder: RoleHandler = {
         // If the builder drifted into a neighboring room, force it back home.
         const homeRoom = creep.memory.homeRoom;
         if (homeRoom && creep.room.name !== homeRoom) {
-            creep.moveTo(new RoomPosition(25, 25, homeRoom), {
+            moveWithSweeper(creep, new RoomPosition(25, 25, homeRoom), {
                 range: 5,
                 visualizePathStyle: { stroke: '#ff0000', lineStyle: 'dashed' }
             });
@@ -58,14 +147,7 @@ export const roleBuilder: RoleHandler = {
 
             if (site) {
                 if (creep.build(site) === ERR_NOT_IN_RANGE) {
-                    // --- VACUUM LOGIC ---
-                    if (creep.store.getFreeCapacity() > 0) {
-                        const vacDrop = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, { filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0 })[0];
-                        const vacTomb = creep.pos.findInRange(FIND_TOMBSTONES, 1, { filter: (t: Tombstone) => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
-                        if (vacDrop) creep.pickup(vacDrop);
-                        else if (vacTomb) creep.withdraw(vacTomb, RESOURCE_ENERGY);
-                    }
-                    creep.moveTo(site, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 10 });
+                    moveWithSweeper(creep, site, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 10 });
                 }
                 return;
             }
@@ -78,14 +160,7 @@ export const roleBuilder: RoleHandler = {
             });
             if (damagedContainer) {
                 if (creep.repair(damagedContainer) === ERR_NOT_IN_RANGE) {
-                    // --- VACUUM LOGIC ---
-                    if (creep.store.getFreeCapacity() > 0) {
-                        const vacDrop = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, { filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0 })[0];
-                        const vacTomb = creep.pos.findInRange(FIND_TOMBSTONES, 1, { filter: (t: Tombstone) => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
-                        if (vacDrop) creep.pickup(vacDrop);
-                        else if (vacTomb) creep.withdraw(vacTomb, RESOURCE_ENERGY);
-                    }
-                    creep.moveTo(damagedContainer, { visualizePathStyle: { stroke: '#ff0000' } });
+                    moveWithSweeper(creep, damagedContainer, { visualizePathStyle: { stroke: '#ff0000' } });
                 }
                 return;
             }
@@ -93,14 +168,7 @@ export const roleBuilder: RoleHandler = {
             // --- PRIORITY 3: Upgrade Controller ---
             if (creep.room.controller && creep.room.controller.my) {
                 if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
-                    // --- VACUUM LOGIC ---
-                    if (creep.store.getFreeCapacity() > 0) {
-                        const vacDrop = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, { filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0 })[0];
-                        const vacTomb = creep.pos.findInRange(FIND_TOMBSTONES, 1, { filter: (t: Tombstone) => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
-                        if (vacDrop) creep.pickup(vacDrop);
-                        else if (vacTomb) creep.withdraw(vacTomb, RESOURCE_ENERGY);
-                    }
-                    creep.moveTo(creep.room.controller, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 10 });
+                    moveWithSweeper(creep, creep.room.controller, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 10 });
                 }
             }
 
@@ -111,10 +179,16 @@ export const roleBuilder: RoleHandler = {
             // A. Target Fixation: Check memory
             if (creep.memory.targetId) {
                 target = Game.getObjectById(creep.memory.targetId as Id<any>);
-                const hasResources = target && (
-                    ('store' in target && target.store.getUsedCapacity(RESOURCE_ENERGY) > 25) ||
-                    ('amount' in target && target.amount > 0)
-                );
+                let hasResources = false;
+                if (target) {
+                    if ('store' in target) {
+                        hasResources = target.store.getUsedCapacity(RESOURCE_ENERGY) > 25;
+                    } else if ('amount' in target) {
+                        hasResources = target.amount > 0;
+                    } else if (target instanceof Source) {
+                        hasResources = target.energy > 0 && hasFreeMiningSpot(target, creep);
+                    }
+                }
                 if (!hasResources) {
                     delete creep.memory.targetId;
                     target = null;
@@ -122,107 +196,84 @@ export const roleBuilder: RoleHandler = {
             }
 
             if (!target) {
-                // Priority 0: Immediate Energy (Structures/Loot within range 2)
-                const immediateSource = creep.pos.findInRange(FIND_STRUCTURES, 2, {
-                    filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_STORAGE) &&
-                        s.store.getUsedCapacity(RESOURCE_ENERGY) > 100
-                })[0] || creep.pos.findInRange(FIND_DROPPED_RESOURCES, 2, {
-                    filter: (r) => r.resourceType === RESOURCE_ENERGY && r.amount > 50
-                })[0];
-
-                if (immediateSource) {
-                    target = immediateSource;
+                // Priority 1: Scavenge from ruins or tombstones
+                const ruinsAndTombstones = [
+                    ...creep.room.find(FIND_TOMBSTONES, { filter: t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 }),
+                    ...creep.room.find(FIND_RUINS, { filter: r => r.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })
+                ];
+                target = findClosestReachable(creep, ruinsAndTombstones);
+                if (target) {
                     creep.memory.targetId = target.id;
                 }
+            }
 
-                // Priority 1: Nearby Source (Local range 5) - Only if no immediate container
-                if (!target) {
-                    const nearbySource = creep.pos.findInRange(FIND_SOURCES_ACTIVE, 5, {
-                        filter: (s) => !COLONY_SETTINGS.ignoredSources.includes(s.id as any)
-                    })[0];
-                    if (nearbySource) {
-                        if (creep.harvest(nearbySource) === ERR_NOT_IN_RANGE) {
-                            creep.moveTo(nearbySource, { visualizePathStyle: { stroke: '#ffaa00' } });
-                        }
-                        return;
+            if (!target) {
+                // Priority 2: Any energy on the ground that there is a path to
+                const droppedEnergy = creep.room.find(FIND_DROPPED_RESOURCES, {
+                    filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 0
+                });
+                target = findClosestReachable(creep, droppedEnergy);
+                if (target) {
+                    creep.memory.targetId = target.id;
+                }
+            }
+
+            if (!target) {
+                // Priority 3: room.storage if there is energy in it
+                const storage = creep.room.storage;
+                if (storage && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    const path = creep.room.findPath(creep.pos, storage.pos, { ignoreCreeps: true, maxOps: 200 });
+                    const isReachable = path.length > 0 && path[path.length - 1].x === storage.pos.x && path[path.length - 1].y === storage.pos.y;
+                    if (isReachable || creep.pos.isNearTo(storage.pos)) {
+                        target = storage;
+                        creep.memory.targetId = target.id;
                     }
                 }
+            }
 
-                // Priority 2: Structures & Loot (Path-aware) - Global search
-                if (!target) {
-                    // 1. Hostile Terminals (Priority 1)
-                    const hostileTerminal = creep.room.find(FIND_HOSTILE_STRUCTURES, {
-                        filter: (s) => s.structureType === STRUCTURE_TERMINAL && s.store[RESOURCE_ENERGY] > 0
-                    })[0];
+            if (!target) {
+                // Priority 4: Containers near sources
+                const sources = creep.room.find(FIND_SOURCES);
+                const containers = creep.room.find(FIND_STRUCTURES, {
+                    filter: s => s.structureType === STRUCTURE_CONTAINER && s.store.getUsedCapacity(RESOURCE_ENERGY) > 25
+                });
+                const sourceContainers = containers.filter(c => 
+                    sources.some(src => c.pos.inRangeTo(src, 2))
+                );
+                target = findClosestReachable(creep, sourceContainers);
+                if (target) {
+                    creep.memory.targetId = target.id;
+                }
+            }
 
-                    // 2. Hostile Storage (Priority 2)
-                    const hostileStorage = !hostileTerminal ? creep.room.find(FIND_HOSTILE_STRUCTURES, {
-                        filter: (s) => s.structureType === STRUCTURE_STORAGE && s.store[RESOURCE_ENERGY] > 0
-                    })[0] : null;
+            if (!target) {
+                // Priority 5: Fallback to room.source (Only if it has active energy and free mining spots)
+                const activeSources = creep.room.find(FIND_SOURCES_ACTIVE).filter(s => 
+                    !COLONY_SETTINGS.ignoredSources.includes(s.id as any) &&
+                    hasFreeMiningSpot(s, creep)
+                );
 
-                    if (hostileTerminal) {
-                        target = hostileTerminal;
-                    } else if (hostileStorage) {
-                        target = hostileStorage;
-                    } else {
-                        const candidates: (StructureContainer | StructureStorage | Tombstone | Resource | Ruin)[] = [
-                            ...creep.room.find(FIND_STRUCTURES, {
-                                filter: (s) => (s.structureType === STRUCTURE_CONTAINER || (s.structureType === STRUCTURE_STORAGE && (s as StructureStorage).my)) &&
-                                    s.store.getUsedCapacity(RESOURCE_ENERGY) > 100
-                            }) as (StructureContainer | StructureStorage)[],
-                            ...creep.room.find(FIND_RUINS, { filter: r => r.store.getUsedCapacity(RESOURCE_ENERGY) > 0 }),
-                            ...creep.room.find(FIND_TOMBSTONES, { filter: t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 }),
-                            ...creep.room.find(FIND_DROPPED_RESOURCES, { filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 25 })
-                        ];
-
-                        let validTarget = null;
-                        let currentCandidates = [...candidates];
-                        
-                        while (currentCandidates.length > 0) {
-                            const closest = creep.pos.findClosestByRange(currentCandidates);
-                            if (!closest) break;
-
-                            // Reachability check for non-structures
-                            if ('amount' in closest || closest instanceof Tombstone || closest instanceof Ruin) {
-                                const path = creep.room.findPath(creep.pos, closest.pos, { ignoreCreeps: true, maxOps: 200 });
-                                const isReachable = path.length > 0 && path[path.length - 1].x === closest.pos.x && path[path.length - 1].y === closest.pos.y;
-                                
-                                if (isReachable || creep.pos.isNearTo(closest.pos)) {
-                                    validTarget = closest;
-                                    break;
-                                } else {
-                                    // Remove and try next closest
-                                    const index = currentCandidates.indexOf(closest);
-                                    if (index > -1) currentCandidates.splice(index, 1);
-                                }
-                            } else {
-                                // Assume structures are reachable (or rely on Stuck Detection)
-                                validTarget = closest;
-                                break;
-                            }
-                        }
-                        target = validTarget;
-                    }
-                    if (target) {
+                if (activeSources.length > 0) {
+                    const closestSource = creep.pos.findClosestByRange(activeSources);
+                    if (closestSource) {
+                        target = closestSource;
                         creep.memory.targetId = target.id;
                     }
                 }
             }
 
             if (target) {
-                const action = (target instanceof Resource)
-                    ? creep.pickup(target)
-                    : creep.withdraw(target, RESOURCE_ENERGY);
+                let action: number;
+                if (target instanceof Resource) {
+                    action = creep.pickup(target);
+                } else if (target instanceof Source) {
+                    action = creep.harvest(target);
+                } else {
+                    action = creep.withdraw(target, RESOURCE_ENERGY);
+                }
 
                 if (action === ERR_NOT_IN_RANGE) {
-                    // --- VACUUM LOGIC ---
-                    if (creep.store.getFreeCapacity() > 0) {
-                        const vacDrop = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, { filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0 })[0];
-                        const vacTomb = creep.pos.findInRange(FIND_TOMBSTONES, 1, { filter: (t: Tombstone) => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
-                        if (vacDrop) creep.pickup(vacDrop);
-                        else if (vacTomb) creep.withdraw(vacTomb, RESOURCE_ENERGY);
-                    }
-                    creep.moveTo(target, { visualizePathStyle: { stroke: '#ffaa00' }, reusePath: 10 });
+                    moveWithSweeper(creep, target, { visualizePathStyle: { stroke: '#ffaa00' }, reusePath: 10 });
                 } else if (action === OK) {
                     if (creep.store.getUsedCapacity() >= creep.store.getCapacity() * 0.8) {
                         creep.memory.working = true;
@@ -234,19 +285,8 @@ export const roleBuilder: RoleHandler = {
                 if (creep.memory.idleTicks && creep.memory.idleTicks > 0) {
                     creep.memory.idleTicks--;
                 } else {
-                    // FALLBACK: Harvest
-                    const sources = creep.room.find(FIND_SOURCES_ACTIVE);
-                    const source = creep.pos.findClosestByRange(sources, {
-                        filter: (s: any) => !COLONY_SETTINGS.ignoredSources.includes(s.id)
-                    });
-
-                    if (source) {
-                        if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
-                            creep.moveTo(source, { visualizePathStyle: { stroke: '#ffaa00' } });
-                        }
-                    } else {
-                        creep.memory.idleTicks = 5;
-                    }
+                    creep.memory.idleTicks = 5;
+                    creep.say('💤 Idle');
                 }
             }
         }
