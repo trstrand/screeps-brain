@@ -26,6 +26,7 @@ export const roleMarketHauler: RoleHandler = {
         if (creep.memory.working && creep.store.getUsedCapacity() === 0) {
             creep.memory.working = false;
             delete creep.memory.targetId;
+            delete creep.memory.deliveryTargetId;
             creep.say('🔄 Fetch');
         }
         // Market haulers deal with low-volume/high-value items. Deliver as soon as we have anything.
@@ -47,8 +48,21 @@ export const roleMarketHauler: RoleHandler = {
             const carrying = Object.keys(creep.store).find(res => creep.store[res as ResourceConstant] > 0) as ResourceConstant | undefined;
 
             if (carrying) {
+                // Priority 0.5: Tower Delivery
+                if (carrying === RESOURCE_ENERGY && creep.memory.deliveryTargetId) {
+                    const tower = Game.getObjectById(creep.memory.deliveryTargetId) as StructureTower | null;
+                    if (tower && tower.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                        if (creep.transfer(tower, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                            creep.moveTo(tower, { visualizePathStyle: { stroke: '#00ff00' } });
+                        }
+                        delivered = true;
+                    } else {
+                        delete creep.memory.deliveryTargetId;
+                    }
+                }
+
                 // Priority 1: Terminal (If it's on the transfer list and terminal isn't full of it)
-                if (terminal) {
+                if (!delivered && terminal) {
                     const transferConfig = transfers.find(t => t.resource === carrying);
                     if (transferConfig) {
                         const currentInTerminal = terminal.store[carrying] || 0;
@@ -128,6 +142,20 @@ export const roleMarketHauler: RoleHandler = {
                             resourceToFetch = specialMineral;
                         }
                     }
+                }
+            }
+
+            // Priority 3: Tower Energy Hauling
+            if (!target && storage) {
+                const towers = creep.room.find(FIND_MY_STRUCTURES, {
+                    filter: s => s.structureType === STRUCTURE_TOWER && s.store.getFreeCapacity(RESOURCE_ENERGY) > 200
+                }) as StructureTower[];
+
+                if (towers.length > 0 && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    const targetTower = towers.reduce((lowest, t) => t.store[RESOURCE_ENERGY] < lowest.store[RESOURCE_ENERGY] ? t : lowest, towers[0]);
+                    target = storage;
+                    resourceToFetch = RESOURCE_ENERGY;
+                    creep.memory.deliveryTargetId = targetTower.id;
                 }
             }
 

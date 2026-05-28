@@ -147,7 +147,18 @@ export class SpawnManager {
 
                 for (const remoteRoomName of remoteRooms) {
                     const remoteQuotas = COLONY_SETTINGS.roomQuotas[remoteRoomName] || {};
-                    const targetCount = (remoteQuotas as any)[role] || 0;
+                    let targetCount = (remoteQuotas as any)[role] || 0;
+
+                    if (role === 'remoteExtractorMiner' && targetCount > 0) {
+                        const remoteRoom = Game.rooms[remoteRoomName];
+                        if (remoteRoom) {
+                            const mineral = remoteRoom.find(FIND_MINERALS)[0];
+                            if (mineral && mineral.ticksToRegeneration && mineral.ticksToRegeneration > 0) {
+                                targetCount = 0;
+                            }
+                        }
+                    }
+
                     const roleCount = allCreeps.filter(c =>
                         c.memory.role === role &&
                         c.memory.targetRoom === remoteRoomName
@@ -193,6 +204,10 @@ export class SpawnManager {
                 if (mineral && quota !== undefined && room.storage) {
                     const currentStock = room.storage.store.getUsedCapacity(mineral.mineralType);
                     if (currentStock >= quota) targetCount = 0;
+                }
+
+                if (mineral && mineral.ticksToRegeneration && mineral.ticksToRegeneration > 0) {
+                    targetCount = 0;
                 }
             }
             if (role === 'marketHauler' && targetCount > 0) {
