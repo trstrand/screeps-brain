@@ -88,7 +88,23 @@ export const roleHauler: RoleHandler = {
                 const isSecondaryTarget = target && (target.structureType === STRUCTURE_TOWER || target.structureType === STRUCTURE_LINK || target.structureType === STRUCTURE_STORAGE);
                 const spawnsNeedEnergy = isSecondaryTarget && this.roomSpawnsNeedEnergy(creep.room);
 
-                if (!target || isFull || spawnsNeedEnergy) {
+                // Drop fixation if we are targeting a tower with >= 60% energy but other towers are starving (<= 60%)
+                let isStarvingTowerElsewhere = false;
+                if (target && target.structureType === STRUCTURE_TOWER) {
+                    const targetTower = target as StructureTower;
+                    if (targetTower.store.getUsedCapacity(RESOURCE_ENERGY) >= targetTower.store.getCapacity(RESOURCE_ENERGY) * 0.6) {
+                        const otherStarving = creep.room.find(FIND_MY_STRUCTURES, {
+                            filter: s => s.structureType === STRUCTURE_TOWER &&
+                                s.id !== targetTower.id &&
+                                s.store.getUsedCapacity(RESOURCE_ENERGY) <= s.store.getCapacity(RESOURCE_ENERGY) * 0.6
+                        });
+                        if (otherStarving.length > 0) {
+                            isStarvingTowerElsewhere = true;
+                        }
+                    }
+                }
+
+                if (!target || isFull || spawnsNeedEnergy || isStarvingTowerElsewhere) {
                     target = null;
                     delete creep.memory.deliveryTargetId;
                 }
@@ -102,11 +118,11 @@ export const roleHauler: RoleHandler = {
                 });
             }
 
-            // 2. Towers < 50%
+            // 2. Towers <= 60%
             if (!target) {
                 target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
                     filter: s => s.structureType === STRUCTURE_TOWER &&
-                        s.store.getUsedCapacity(RESOURCE_ENERGY) < s.store.getCapacity(RESOURCE_ENERGY) * 0.5
+                        s.store.getUsedCapacity(RESOURCE_ENERGY) <= s.store.getCapacity(RESOURCE_ENERGY) * 0.6
                 });
             }
 

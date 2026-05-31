@@ -151,4 +151,60 @@ describe('Role: Hauler', () => {
         expect(mockCreep.moveTo).toHaveBeenCalledWith(mockSpawn, expect.any(Object));
         expect(mockCreep.say).toHaveBeenCalledWith('💤 Idle');
     });
+
+    it('should drop tower fixation if current tower target is >= 60% full but another tower is <= 60% full', () => {
+        mockCreep.memory.working = true;
+        mockCreep.memory.deliveryTargetId = 'tower_1';
+        mockCreep.store.getUsedCapacity.mockReturnValue(50);
+        mockCreep.store.getFreeCapacity.mockReturnValue(0);
+
+        mockCreep.room.energyAvailable = 300;
+        mockCreep.room.energyCapacityAvailable = 300;
+
+        const mockTower1 = {
+            id: 'tower_1',
+            structureType: (globalThis as any).STRUCTURE_TOWER,
+            store: {
+                getUsedCapacity: (res: any) => res === 'energy' ? 650 : 0,
+                getCapacity: (res: any) => res === 'energy' ? 1000 : 0,
+                getFreeCapacity: (res: any) => res === 'energy' ? 350 : 0
+            }
+        };
+
+        const mockTower2 = {
+            id: 'tower_2',
+            structureType: (globalThis as any).STRUCTURE_TOWER,
+            store: {
+                getUsedCapacity: (res: any) => res === 'energy' ? 550 : 0,
+                getCapacity: (res: any) => res === 'energy' ? 1000 : 0,
+                getFreeCapacity: (res: any) => res === 'energy' ? 450 : 0
+            }
+        };
+
+        (globalThis as any).Game.getObjectById = vi.fn().mockImplementation((id) => {
+            if (id === 'tower_1') return mockTower1;
+            if (id === 'tower_2') return mockTower2;
+            return null;
+        });
+
+        mockCreep.room.find = vi.fn().mockImplementation((type, options) => {
+            if (type === (globalThis as any).FIND_MY_STRUCTURES) {
+                const structures = [mockTower1, mockTower2];
+                if (options && options.filter) {
+                    return structures.filter(options.filter);
+                }
+                return structures;
+            }
+            return [];
+        });
+
+        mockCreep.pos.findClosestByRange.mockImplementation((typeOrArray) => {
+            if (Array.isArray(typeOrArray)) return typeOrArray[0];
+            return mockTower2;
+        });
+
+        roleHauler.run(mockCreep);
+
+        expect(mockCreep.memory.deliveryTargetId).toBe('tower_2');
+    });
 });

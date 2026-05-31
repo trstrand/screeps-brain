@@ -1,5 +1,34 @@
 import { COLONY_SETTINGS } from '../config/settings';
 
+/**
+ * Sweeps up nearby dropped resources, tombstones, or ruins before moving.
+ */
+function moveWithSweeper(creep: Creep, target: RoomPosition | { pos: RoomPosition }, options?: any): number {
+    if (creep.store.getFreeCapacity() > 0) {
+        const vacDrop = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, { filter: (r: Resource) => r.amount > 0 })[0];
+        if (vacDrop) {
+            creep.pickup(vacDrop);
+        } else {
+            const vacTomb = creep.pos.findInRange(FIND_TOMBSTONES, 1, { filter: (t: Tombstone) => t.store.getUsedCapacity() > 0 })[0];
+            if (vacTomb) {
+                const resType = Object.keys(vacTomb.store).find(k => vacTomb.store[k as ResourceConstant] > 0) as ResourceConstant | undefined;
+                if (resType) {
+                    creep.withdraw(vacTomb, resType);
+                }
+            } else {
+                const vacRuin = creep.pos.findInRange(FIND_RUINS, 1, { filter: (r: Ruin) => r.store.getUsedCapacity() > 0 })[0];
+                if (vacRuin) {
+                    const resType = Object.keys(vacRuin.store).find(k => vacRuin.store[k as ResourceConstant] > 0) as ResourceConstant | undefined;
+                    if (resType) {
+                        creep.withdraw(vacRuin, resType);
+                    }
+                }
+            }
+        }
+    }
+    return creep.moveTo(target, options);
+}
+
 export const roleMarketHauler: RoleHandler = {
     run(creep: Creep): void {
         // --- STUCK DETECTION ---
@@ -53,7 +82,7 @@ export const roleMarketHauler: RoleHandler = {
                     const tower = Game.getObjectById(creep.memory.deliveryTargetId) as StructureTower | null;
                     if (tower && tower.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                         if (creep.transfer(tower, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                            creep.moveTo(tower, { visualizePathStyle: { stroke: '#00ff00' } });
+                            moveWithSweeper(creep, tower, { visualizePathStyle: { stroke: '#00ff00' } });
                         }
                         delivered = true;
                     } else {
@@ -68,7 +97,7 @@ export const roleMarketHauler: RoleHandler = {
                         const currentInTerminal = terminal.store[carrying] || 0;
                         if (currentInTerminal < transferConfig.amount) {
                             if (creep.transfer(terminal, carrying) === ERR_NOT_IN_RANGE) {
-                                creep.moveTo(terminal, { visualizePathStyle: { stroke: '#00ffff' } });
+                                moveWithSweeper(creep, terminal, { visualizePathStyle: { stroke: '#00ffff' } });
                             }
                             delivered = true;
                         }
@@ -78,7 +107,7 @@ export const roleMarketHauler: RoleHandler = {
                 // Priority 2: Storage (Default for minerals from extractors or canceled terminal transfers)
                 if (!delivered && storage) {
                     if (creep.transfer(storage, carrying) === ERR_NOT_IN_RANGE) {
-                        creep.moveTo(storage, { visualizePathStyle: { stroke: '#ffffff' } });
+                        moveWithSweeper(creep, storage, { visualizePathStyle: { stroke: '#ffffff' } });
                     }
                 }
             }
@@ -93,8 +122,30 @@ export const roleMarketHauler: RoleHandler = {
             const storage = creep.room.storage;
             const transfers = (COLONY_SETTINGS.terminalTransfers && COLONY_SETTINGS.terminalTransfers[creep.room.name]) || [];
 
-            // Priority 1: Terminal Transfers (Storage -> Terminal)
-            if (terminal && storage) {
+            // Priority 1: Reachable Dropped Resources or Energy on the Ground
+            const dropped = creep.room.find(FIND_DROPPED_RESOURCES);
+            if (dropped.length > 0) {
+                let remainingDrops = [...dropped];
+                while (remainingDrops.length > 0) {
+                    const closest = creep.pos.findClosestByRange(remainingDrops);
+                    if (!closest) break;
+
+                    const path = creep.room.findPath(creep.pos, closest.pos, { ignoreCreeps: true, maxOps: 200 });
+                    const isReachable = path.length > 0 && path[path.length - 1].x === closest.pos.x && path[path.length - 1].y === closest.pos.y;
+
+                    if (isReachable || creep.pos.isNearTo(closest.pos)) {
+                        target = closest;
+                        resourceToFetch = closest.resourceType;
+                        break;
+                    } else {
+                        const index = remainingDrops.indexOf(closest);
+                        if (index > -1) remainingDrops.splice(index, 1);
+                    }
+                }
+            }
+
+            // Priority 2: Terminal Transfers (Storage -> Terminal)
+            if (!target && terminal && storage) {
                 for (const transfer of transfers) {
                     const currentInTerminal = terminal.store[transfer.resource] || 0;
                     if (currentInTerminal < transfer.amount) {
@@ -108,7 +159,7 @@ export const roleMarketHauler: RoleHandler = {
                 }
             }
 
-            // Priority 2: Extractor Minerals
+            // Priority 3: Extractor Minerals
             const extractor = creep.room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTRACTOR } })[0];
             const mineral = creep.room.find(FIND_MINERALS)[0];
             const quota = COLONY_SETTINGS.mineralQuotas[creep.room.name];
@@ -145,7 +196,7 @@ export const roleMarketHauler: RoleHandler = {
                 }
             }
 
-            // Priority 3: Tower Energy Hauling
+            // Priority 4: Tower Energy Hauling
             if (!target && storage) {
                 const towers = creep.room.find(FIND_MY_STRUCTURES, {
                     filter: s => s.structureType === STRUCTURE_TOWER && s.store.getFreeCapacity(RESOURCE_ENERGY) > 200
@@ -181,13 +232,13 @@ export const roleMarketHauler: RoleHandler = {
                         creep.withdraw(target, resourceToFetch);
                     }
                 } else {
-                    creep.moveTo(target, { visualizePathStyle: { stroke: '#ffaa00' } });
+                    moveWithSweeper(creep, target, { visualizePathStyle: { stroke: '#ffaa00' } });
                 }
             } else {
                 // Idle near storage
                 if (storage) {
                     if (creep.pos.getRangeTo(storage) > 3) {
-                        creep.moveTo(storage, { range: 3, visualizePathStyle: { stroke: '#555555' } });
+                        moveWithSweeper(creep, storage, { range: 3, visualizePathStyle: { stroke: '#555555' } });
                     } else {
                         creep.say('💤 Idle');
                     }
