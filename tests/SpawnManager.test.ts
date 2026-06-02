@@ -2,39 +2,41 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Use vi.hoisted to ensure these globals are defined BEFORE any imports are processed
 vi.hoisted(() => {
-    (global as any).OK = 0;
-    (global as any).ERR_NOT_ENOUGH_ENERGY = -6;
-    (global as any).FIND_MY_SPAWNS = 1;
-    (global as any).FIND_HOSTILE_CREEPS = 103;
-    (global as any).FIND_SOURCES = 112;
-    (global as any).FIND_STRUCTURES = 101;
-    (global as any).FIND_MY_STRUCTURES = 102;
-    (global as any).FIND_MINERALS = 116;
-    (global as any).FIND_CONSTRUCTION_SITES = 111;
-    (global as any).STRUCTURE_CONTAINER = 'container';
-    (global as any).STRUCTURE_STORAGE = 'storage';
-    (global as any).STRUCTURE_SPAWN = 'spawn';
-    (global as any).STRUCTURE_EXTENSION = 'extension';
-    (global as any).STRUCTURE_TOWER = 'tower';
-    (global as any).STRUCTURE_WALL = 'wall';
-    (global as any).STRUCTURE_RAMPART = 'rampart';
-    (global as any).STRUCTURE_ROAD = 'road';
-    (global as any).STRUCTURE_EXTRACTOR = 'extractor';
-    (global as any).STRUCTURE_CONTROLLER = 'controller';
-    (global as any).RESOURCE_ENERGY = 'energy';
+    (globalThis as any).OK = 0;
+    (globalThis as any).ERR_NOT_ENOUGH_ENERGY = -6;
+    (globalThis as any).FIND_MY_SPAWNS = 1;
+    (globalThis as any).FIND_HOSTILE_CREEPS = 103;
+    (globalThis as any).FIND_SOURCES = 112;
+    (globalThis as any).FIND_STRUCTURES = 101;
+    (globalThis as any).FIND_MY_STRUCTURES = 102;
+    (globalThis as any).FIND_MINERALS = 116;
+    (globalThis as any).FIND_CONSTRUCTION_SITES = 111;
+    (globalThis as any).STRUCTURE_CONTAINER = 'container';
+    (globalThis as any).STRUCTURE_STORAGE = 'storage';
+    (globalThis as any).STRUCTURE_SPAWN = 'spawn';
+    (globalThis as any).STRUCTURE_EXTENSION = 'extension';
+    (globalThis as any).STRUCTURE_TOWER = 'tower';
+    (globalThis as any).STRUCTURE_WALL = 'wall';
+    (globalThis as any).STRUCTURE_RAMPART = 'rampart';
+    (globalThis as any).STRUCTURE_ROAD = 'road';
+    (globalThis as any).STRUCTURE_EXTRACTOR = 'extractor';
+    (globalThis as any).STRUCTURE_CONTROLLER = 'controller';
+    (globalThis as any).RESOURCE_ENERGY = 'energy';
+    (globalThis as any).RESOURCE_POWER = 'power';
+    (globalThis as any).RESOURCE_OPS = 'ops';
 
-    (global as any).MOVE = 'move';
-    (global as any).WORK = 'work';
-    (global as any).CARRY = 'carry';
-    (global as any).ATTACK = 'attack';
-    (global as any).RANGED_ATTACK = 'ranged_attack';
-    (global as any).HEAL = 'heal';
-    (global as any).TOUGH = 'tough';
-    (global as any).CLAIM = 'claim';
+    (globalThis as any).MOVE = 'move';
+    (globalThis as any).WORK = 'work';
+    (globalThis as any).CARRY = 'carry';
+    (globalThis as any).ATTACK = 'attack';
+    (globalThis as any).RANGED_ATTACK = 'ranged_attack';
+    (globalThis as any).HEAL = 'heal';
+    (globalThis as any).TOUGH = 'tough';
+    (globalThis as any).CLAIM = 'claim';
 });
 
 import { SpawnManager } from '../src/managers/SpawnManager';
-import { COLONY_SETTINGS } from '../src/config.creeps';
+import { COLONY_SETTINGS } from '../src/config/settings';
 
 // Mocking Screeps Globals
 const mockSpawn = {
@@ -58,7 +60,7 @@ const mockRoom = {
 };
 
 // Mock Game object
-(global as any).Game = {
+(globalThis as any).Game = {
     creeps: {},
     time: 100,
     spawns: { 'Spawn1': mockSpawn },
@@ -69,6 +71,7 @@ describe('SpawnManager', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         Game.creeps = {};
+        Game.rooms = { 'E1N1': mockRoom as any };
         mockRoom.memory = {};
         
         // Default Quotas
@@ -127,7 +130,7 @@ describe('SpawnManager', () => {
         const minerCall = mockSpawn.spawnCreep.mock.calls.find(call => call[1].startsWith('miner'));
         
         expect(minerCall).toBeDefined();
-        expect(minerCall[2].memory).toMatchObject({
+        expect(minerCall![2].memory).toMatchObject({
             role: 'miner',
             sourceIndex: 1
         });
@@ -155,5 +158,121 @@ describe('SpawnManager', () => {
 
         const builderCall = mockSpawn.spawnCreep.mock.calls.find(call => call[1].startsWith('builder'));
         expect(builderCall).toBeUndefined();
+    });
+
+    it('should skip extractorMiner if the mineral is on cooldown (ticksToRegeneration > 0)', () => {
+        // Satisfy all other quotas
+        (Game as any).creeps = {
+            'miner1': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 0 } },
+            'miner2': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 1 } },
+            'hauler1': { memory: { role: 'hauler', homeRoom: 'E1N1' } },
+            'hauler2': { memory: { role: 'hauler', homeRoom: 'E1N1' } },
+            'upgrader1': { memory: { role: 'upgrader', homeRoom: 'E1N1' } }
+        } as any;
+
+        COLONY_SETTINGS.roomQuotas['E1N1'].extractorMiner = 1;
+
+        // Mock room.find for EXTRACTOR and mineral
+        mockRoom.find = vi.fn().mockImplementation((type) => {
+            if (type === 1 /* FIND_MY_SPAWNS */) return [mockSpawn];
+            if (type === 102 /* FIND_MY_STRUCTURES */) return [{ structureType: 'extractor' }];
+            if (type === 116 /* FIND_MINERALS */) return [{ mineralType: 'U', ticksToRegeneration: 50 }];
+            return [];
+        });
+
+        SpawnManager.run(mockRoom as any);
+
+        const extractorCall = mockSpawn.spawnCreep.mock.calls.find(call => call[1].startsWith('extractorMiner'));
+        expect(extractorCall).toBeUndefined();
+    });
+
+    it('should spawn extractorMiner if the mineral is NOT on cooldown', () => {
+        // Satisfy all other quotas
+        (Game as any).creeps = {
+            'miner1': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 0 } },
+            'miner2': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 1 } },
+            'hauler1': { memory: { role: 'hauler', homeRoom: 'E1N1' } },
+            'hauler2': { memory: { role: 'hauler', homeRoom: 'E1N1' } },
+            'upgrader1': { memory: { role: 'upgrader', homeRoom: 'E1N1' } }
+        } as any;
+
+        COLONY_SETTINGS.roomQuotas['E1N1'].extractorMiner = 1;
+
+        // Mock room.find for EXTRACTOR and mineral
+        mockRoom.find = vi.fn().mockImplementation((type) => {
+            if (type === 1 /* FIND_MY_SPAWNS */) return [mockSpawn];
+            if (type === 102 /* FIND_MY_STRUCTURES */) return [{ structureType: 'extractor' }];
+            if (type === 116 /* FIND_MINERALS */) return [{ mineralType: 'U', ticksToRegeneration: undefined }];
+            return [];
+        });
+
+        SpawnManager.run(mockRoom as any);
+
+        const extractorCall = mockSpawn.spawnCreep.mock.calls.find(call => call[1].startsWith('extractorMiner'));
+        expect(extractorCall).toBeDefined();
+    });
+
+    it('should skip remoteExtractorMiner if the remote mineral is on cooldown', () => {
+        // Satisfy all other quotas
+        (Game as any).creeps = {
+            'miner1': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 0 } },
+            'miner2': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 1 } },
+            'hauler1': { memory: { role: 'hauler', homeRoom: 'E1N1' } },
+            'hauler2': { memory: { role: 'hauler', homeRoom: 'E1N1' } },
+            'upgrader1': { memory: { role: 'upgrader', homeRoom: 'E1N1' } }
+        } as any;
+
+        COLONY_SETTINGS.remoteMining = {
+            'E1N1': ['E1N2']
+        };
+        COLONY_SETTINGS.roomQuotas['E1N2'] = {
+            remoteExtractorMiner: 1
+        };
+
+        const mockRemoteRoom = {
+            name: 'E1N2',
+            find: vi.fn().mockImplementation((type) => {
+                if (type === 116 /* FIND_MINERALS */) return [{ mineralType: 'U', ticksToRegeneration: 50 }];
+                return [];
+            })
+        };
+        Game.rooms['E1N2'] = mockRemoteRoom as any;
+
+        SpawnManager.run(mockRoom as any);
+
+        const remoteCall = mockSpawn.spawnCreep.mock.calls.find(call => call[1].startsWith('remoteExtractorMiner'));
+        expect(remoteCall).toBeUndefined();
+    });
+
+    it('should spawn remoteExtractorMiner if the remote mineral is NOT on cooldown', () => {
+        // Satisfy all other quotas
+        (Game as any).creeps = {
+            'miner1': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 0 } },
+            'miner2': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 1 } },
+            'hauler1': { memory: { role: 'hauler', homeRoom: 'E1N1' } },
+            'hauler2': { memory: { role: 'hauler', homeRoom: 'E1N1' } },
+            'upgrader1': { memory: { role: 'upgrader', homeRoom: 'E1N1' } }
+        } as any;
+
+        COLONY_SETTINGS.remoteMining = {
+            'E1N1': ['E1N2']
+        };
+        COLONY_SETTINGS.roomQuotas['E1N2'] = {
+            remoteExtractorMiner: 1
+        };
+
+        const mockRemoteRoom = {
+            name: 'E1N2',
+            find: vi.fn().mockImplementation((type) => {
+                if (type === 116 /* FIND_MINERALS */) return [{ mineralType: 'U', ticksToRegeneration: undefined }];
+                return [];
+            })
+        };
+        Game.rooms['E1N2'] = mockRemoteRoom as any;
+
+        SpawnManager.run(mockRoom as any);
+
+        const remoteCall = mockSpawn.spawnCreep.mock.calls.find(call => call[1].startsWith('remoteExtractorMiner'));
+        expect(remoteCall).toBeDefined();
     });
 });

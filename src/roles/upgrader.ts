@@ -1,134 +1,88 @@
-import { COLONY_SETTINGS } from '../config.creeps';
+import { COLONY_SETTINGS } from '../config/settings';
+
 
 export const roleUpgrader: RoleHandler = {
     run(creep: Creep): void {
-        // --- 1. DYNAMIC CONTAINER NEGOTIATION ---
-        let upgradeContainer = Game.getObjectById(creep.memory.targetContainerId as Id<StructureContainer>);
+        const controller = creep.room.controller;
+        if (!controller) return;
 
-        if (!upgradeContainer) {
-            delete creep.memory.targetContainerId;
-            if (creep.room.controller) {
-                // Find containers close to the controller (range <= 3 for upgrading)
-                // and explicitly exclude containers that are adjacent to sources (source containers)
-                let containers = creep.room.find(FIND_STRUCTURES, {
-                    filter: s => s.structureType === STRUCTURE_CONTAINER &&
-                        s.pos.getRangeTo(creep.room.controller!) <= 3 &&
-                        s.pos.findInRange(FIND_SOURCES, 1).length === 0
-                }) as StructureContainer[];
+        // 1. Identify Infrastructure
+        const container = controller.pos.findInRange(FIND_STRUCTURES, 1, {
+            filter: s => s.structureType === STRUCTURE_CONTAINER
+        })[0] as StructureContainer | undefined;
 
-                // Sort by distance to controller to prefer the ones 'directly next' to it
-                containers.sort((a, b) => a.pos.getRangeTo(creep.room.controller!) - b.pos.getRangeTo(creep.room.controller!));
+        // Check memory for controllerLink, fallback to search
+        let link: StructureLink | null | undefined = Game.getObjectById(creep.room.memory.controllerLink as Id<StructureLink>);
+        if (!link) {
+            link = controller.pos.findInRange(FIND_MY_STRUCTURES, 3, {
+                filter: s => s.structureType === STRUCTURE_LINK
+            })[0] as StructureLink | undefined;
+        }
 
-                const otherUpgraders = Object.values(Game.creeps).filter(c =>
-                    c.memory.role === creep.memory.role &&
-                    c.id !== creep.id &&
-                    c.memory.targetContainerId
-                );
-                const claimedIds = otherUpgraders.map(c => c.memory.targetContainerId);
-
-                const availableContainer = containers.find(c => !claimedIds.includes(c.id));
-
-                if (availableContainer) {
-                    creep.memory.targetContainerId = availableContainer.id;
-                    upgradeContainer = availableContainer;
-                }
+        // 2. Siphon Logic: Pull from Link (Priority) or Container every tick if we have space
+        if (creep.store.getFreeCapacity() > 0) {
+            if (link && link.store[RESOURCE_ENERGY] > 0 && creep.pos.getRangeTo(link) <= 1) {
+                creep.withdraw(link, RESOURCE_ENERGY);
+            } else if (container && container.store[RESOURCE_ENERGY] > 0 && creep.pos.getRangeTo(container) <= 1) {
+                creep.withdraw(container, RESOURCE_ENERGY);
             }
         }
 
-        // --- 2. STATE MAINTENANCE ---
-        if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0) {
+        // 3. State Management
+        const hasLocalEnergy = (container && container.store[RESOURCE_ENERGY] > 0) || (link && link.store[RESOURCE_ENERGY] > 0);
+        
+        if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0 && !hasLocalEnergy) {
             creep.memory.working = false;
-            creep.say('🔍 Get Energy');
+            creep.say('🔍 Fetch');
         }
-        if (!creep.memory.working && creep.store.getFreeCapacity() === 0) {
+        if (!creep.memory.working && (creep.store.getUsedCapacity() > 0 || hasLocalEnergy)) {
             creep.memory.working = true;
             creep.say('⚡ Upgrade');
         }
 
-        const controller = creep.room.controller;
-        if (!controller) return;
-
-        // --- 3. WORK PHASE ---
+        // 4. Execution
         if (creep.memory.working) {
-            if (upgradeContainer) {
-                // Static Upgrader Logic
-                if (!creep.pos.isEqualTo(upgradeContainer.pos)) {
-                    creep.moveTo(upgradeContainer, { range: 0, visualizePathStyle: { stroke: '#ffffff' } });
+            // Position ourselves: 
+            // - If we are on the container, stay there.
+            // - If we aren't, move to range 1 of the container/link (or range 0 if it's empty).
+            const onSpot = container && creep.pos.isEqualTo(container.pos);
+            
+            if (container && !onSpot) {
+                // Try to get on the container, but don't get stuck if it's occupied
+                const isOccupied = container.pos.lookFor(LOOK_CREEPS).length > 0;
+                if (!isOccupied) {
+                    creep.moveTo(container, { range: 0 });
+                } else {
+                    creep.moveTo(container, { range: 1 });
                 }
+            } else if (link && !onSpot) {
+                creep.moveTo(link, { range: 1 });
+            }
 
-                if (creep.upgradeController(controller) === ERR_NOT_IN_RANGE) {
+            // Passive Repair (Prioritize repairing container if below 95%)
+            if (container && creep.pos.isEqualTo(container.pos) && container.hits < container.hitsMax * 0.95) {
+                creep.repair(container);
+                creep.say('🔧 Repair');
+            } else {
+                const result = creep.upgradeController(controller);
+                if (result === ERR_NOT_IN_RANGE) {
                     creep.moveTo(controller, { range: 3 });
                 }
-
-                // Auto-repair the container under feet
-                const containerAtPos = creep.pos.lookFor(LOOK_STRUCTURES).find(
-                    s => s.structureType === STRUCTURE_CONTAINER
-                ) as StructureContainer | undefined;
-                if (containerAtPos && containerAtPos.hits < containerAtPos.hitsMax * 0.99) {
-                    creep.repair(containerAtPos);
-                    creep.say('🔧 Repair');
-                }
-            } else {
-                // Traditional Upgrader Logic
-                if (creep.upgradeController(controller) === ERR_NOT_IN_RANGE) {
-                    creep.moveTo(controller, {
-                        visualizePathStyle: { stroke: '#ffffff' },
-                        reusePath: 10
-                    });
+            }
+        } else {
+            // Refill Phase: Go to the nearest non-controller container or storage
+            let target = Game.getObjectById(creep.memory.targetId as Id<StructureStorage | StructureContainer>);
+            
+            if (!target || target.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                if (creep.room.storage && creep.room.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    target = creep.room.storage;
+                    creep.memory.targetId = target.id;
                 }
             }
-        }
-        // --- 4. COLLECTION PHASE ---
-        else {
-            if (upgradeContainer && upgradeContainer.store[RESOURCE_ENERGY] > 0) {
-                if (creep.withdraw(upgradeContainer, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                    creep.moveTo(upgradeContainer, { range: 0 });
-                }
-            } else {
-                // FALLBACKS (Applies to both Traditional and empty-Container Static)
 
-                // Fallback A: Loot (Path-aware)
-                const lootCandidates: (Resource | Tombstone)[] = [
-                    ...creep.room.find(FIND_DROPPED_RESOURCES, { filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 50 }),
-                    ...creep.room.find(FIND_TOMBSTONES, { filter: t => t.store[RESOURCE_ENERGY] > 0 })
-                ];
-                
-                const loot = creep.pos.findClosestByPath(lootCandidates);
-
-                if (loot) {
-                    const action = ('amount' in loot) ? creep.pickup(loot as Resource) : creep.withdraw(loot as Tombstone, RESOURCE_ENERGY);
-                    if (action === ERR_NOT_IN_RANGE) {
-                        creep.moveTo(loot, { visualizePathStyle: { stroke: '#ffaa00' } });
-                    }
-                }
-                // Fallback B: Other storage/containers
-                else {
-                    const backup = creep.pos.findClosestByPath(FIND_STRUCTURES, {
-                        filter: s => (s.structureType === STRUCTURE_STORAGE || s.structureType === STRUCTURE_CONTAINER) &&
-                            s.store[RESOURCE_ENERGY] > 0 && s.id !== upgradeContainer?.id
-                    });
-
-                    if (backup) {
-                        if (creep.withdraw(backup, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                            creep.moveTo(backup, { visualizePathStyle: { stroke: '#ffaa00' } });
-                        }
-                    }
-                    // Fallback C: Harvest active source
-                    else {
-                        const source = creep.pos.findClosestByPath(FIND_SOURCES_ACTIVE, {
-                            filter: (s) => !COLONY_SETTINGS.ignoredSources.includes(s.id as any)
-                        });
-
-                        if (source) {
-                            if (creep.harvest(source) === ERR_NOT_IN_RANGE) {
-                                creep.moveTo(source, {
-                                    visualizePathStyle: { stroke: '#ffaa00' },
-                                    maxOps: 4000,
-                                    reusePath: 15
-                                });
-                            }
-                        }
-                    }
+            if (target) {
+                if (creep.withdraw(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(target, { range: 1, visualizePathStyle: { stroke: '#ffaa00' } });
                 }
             }
         }

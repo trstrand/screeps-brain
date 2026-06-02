@@ -1,12 +1,13 @@
-import { COLONY_SETTINGS } from '../config.creeps';
+import { COLONY_SETTINGS } from '../config/settings';
+
 
 export const roleHauler: RoleHandler = {
     run(creep: Creep): void {
         // --- 0. ROOM LOCK & BORDER SAFETY ---
         const homeRoom = creep.memory.homeRoom;
         if (homeRoom && creep.room.name !== homeRoom) {
-            creep.moveTo(new RoomPosition(25, 25, homeRoom), { 
-                visualizePathStyle: { stroke: '#ffffff' } 
+            creep.moveTo(new RoomPosition(25, 25, homeRoom), {
+                visualizePathStyle: { stroke: '#ffffff' }
             });
             creep.say('🏠 Home');
             return;
@@ -18,8 +19,34 @@ export const roleHauler: RoleHandler = {
             return;
         }
 
+        // --- STUCK DETECTION ---
+        if (creep.memory.targetId || creep.memory.deliveryTargetId) {
+            const lastPos = creep.memory.lastPos;
+            if (lastPos && lastPos.x === creep.pos.x && lastPos.y === creep.pos.y && lastPos.roomName === creep.room.name) {
+                creep.memory.stuckCount = (creep.memory.stuckCount || 0) + 1;
+            } else {
+                creep.memory.stuckCount = 0;
+            }
+            creep.memory.lastPos = { x: creep.pos.x, y: creep.pos.y, roomName: creep.room.name };
+
+            if ((creep.memory.stuckCount || 0) > 5) {
+                delete creep.memory.targetId;
+                delete creep.memory.deliveryTargetId;
+                creep.memory.stuckCount = 0;
+                creep.say('🔄 Stuck!');
+            }
+        } else {
+            delete creep.memory.lastPos;
+            creep.memory.stuckCount = 0;
+        }
+
+        // --- PRE-LOAD CACHE ---
+        const allDrops = creep.room.find(FIND_DROPPED_RESOURCES);
+        const allTombstones = creep.room.find(FIND_TOMBSTONES);
+        const allContainers = creep.room.find(FIND_STRUCTURES, { filter: s => s.structureType === STRUCTURE_CONTAINER }) as StructureContainer[];
+        const mySpawns = creep.room.find(FIND_MY_SPAWNS);
+
         // --- 0. JUNK MANAGEMENT ---
-        // If we accidentally picked up minerals/junk, go dump them in storage immediately.
         const junkResource = Object.keys(creep.store).find(r => r !== RESOURCE_ENERGY) as ResourceConstant | undefined;
         if (junkResource && creep.store[junkResource] > 0) {
             const storage = creep.room.storage;
@@ -36,48 +63,120 @@ export const roleHauler: RoleHandler = {
         if (creep.memory.working && creep.store.getUsedCapacity() === 0) {
             creep.memory.working = false;
             delete creep.memory.targetId;
+            delete creep.memory.deliveryTargetId;
             creep.say('🔄 Loading');
         }
 
         if (!creep.memory.working && creep.store.getFreeCapacity() === 0) {
             creep.memory.working = true;
             delete creep.memory.targetId;
+            delete creep.memory.deliveryTargetId;
             creep.say('📦 Deposit');
         }
 
         // --- 2. DELIVERY PHASE ---
         if (creep.memory.working) {
-            // IF CARRYING ENERGY: Normal priority
-            let target: any = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
-                filter: (s) => (s.structureType === STRUCTURE_EXTENSION || s.structureType === STRUCTURE_SPAWN) &&
-                    s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
-            });
+            let target: any = null;
 
-            if (!target) {
-                target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
-                    filter: (s) => s.structureType === STRUCTURE_TOWER &&
-                        s.store.getUsedCapacity(RESOURCE_ENERGY) < (s.store.getCapacity(RESOURCE_ENERGY) * 0.5)
-                });
-            }
+            if (creep.memory.deliveryTargetId) {
+                target = Game.getObjectById(creep.memory.deliveryTargetId as Id<any>);
 
-            if (!target) {
-                target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
-                    filter: (s) => s.structureType === STRUCTURE_TOWER && s.store.getFreeCapacity(RESOURCE_ENERGY) > 100
-                });
-            }
+                // Drop fixation if target is full
+                const isFull = target && 'store' in target && target.store.getFreeCapacity(RESOURCE_ENERGY) === 0;
 
-            if (!target) target = creep.room.storage;
+                // Drop fixation if we are targeting a secondary structure but SPAWNS/EXTENSIONS need energy
+                const isSecondaryTarget = target && (target.structureType === STRUCTURE_TOWER || target.structureType === STRUCTURE_LINK || target.structureType === STRUCTURE_STORAGE);
+                const spawnsNeedEnergy = isSecondaryTarget && this.roomSpawnsNeedEnergy(creep.room);
 
-            if (!target) {
-                const spawn = creep.room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_SPAWN } })[0];
-                if (spawn) {
-                    if (creep.pos.getRangeTo(spawn) > 5) {
-                        creep.moveTo(spawn, { range: 5, visualizePathStyle: { stroke: '#ffffff' } });
+                // Drop fixation if we are targeting a tower with >= 60% energy but other towers are starving (<= 60%)
+                let isStarvingTowerElsewhere = false;
+                if (target && target.structureType === STRUCTURE_TOWER) {
+                    const targetTower = target as StructureTower;
+                    if (targetTower.store.getUsedCapacity(RESOURCE_ENERGY) >= targetTower.store.getCapacity(RESOURCE_ENERGY) * 0.6) {
+                        const otherStarving = creep.room.find(FIND_MY_STRUCTURES, {
+                            filter: s => s.structureType === STRUCTURE_TOWER &&
+                                s.id !== targetTower.id &&
+                                s.store.getUsedCapacity(RESOURCE_ENERGY) <= s.store.getCapacity(RESOURCE_ENERGY) * 0.6
+                        });
+                        if (otherStarving.length > 0) {
+                            isStarvingTowerElsewhere = true;
+                        }
                     }
-                    creep.say('💤 Idle (E)');
                 }
-            } else if (creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
-                creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 10 });
+
+                if (!target || isFull || spawnsNeedEnergy || isStarvingTowerElsewhere) {
+                    target = null;
+                    delete creep.memory.deliveryTargetId;
+                }
+            }
+
+            // 1. Spawns and Extensions
+            if (!target && creep.room.energyAvailable < creep.room.energyCapacityAvailable) {
+                target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
+                    filter: s => (s.structureType === STRUCTURE_SPAWN || s.structureType === STRUCTURE_EXTENSION) &&
+                        s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+                });
+            }
+
+            // 2. Towers <= 60%
+            if (!target) {
+                target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
+                    filter: s => s.structureType === STRUCTURE_TOWER &&
+                        s.store.getUsedCapacity(RESOURCE_ENERGY) <= s.store.getCapacity(RESOURCE_ENERGY) * 0.6
+                });
+            }
+
+            // 3. Link Logic
+            if (!target && creep.room.memory.storageLink) {
+                const storageLink = Game.getObjectById(creep.room.memory.storageLink as Id<StructureLink>);
+                const hasSourceLink = !!creep.room.memory.sourceLink1 || !!creep.room.memory.sourceLink2;
+
+                if (storageLink) {
+                    if (hasSourceLink) {
+                        if (storageLink.store.getUsedCapacity(RESOURCE_ENERGY) > storageLink.store.getCapacity(RESOURCE_ENERGY) * 0.1) {
+                            if (creep.room.storage && creep.room.storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                                target = creep.room.storage;
+                            }
+                        }
+                    } else if (creep.room.memory.controllerLink) {
+                        if (storageLink.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                            target = storageLink;
+                        }
+                    }
+                }
+            }
+
+            // 4. Fill towers to 100%
+            if (!target) {
+                target = creep.pos.findClosestByRange(FIND_MY_STRUCTURES, {
+                    filter: s => s.structureType === STRUCTURE_TOWER &&
+                        s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+                });
+            }
+
+            // 5. Room Storage Fallback
+            if (!target && creep.room.storage && creep.room.storage.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                target = creep.room.storage;
+            }
+
+            if (target) {
+                creep.memory.deliveryTargetId = target.id;
+                if (creep.transfer(target, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
+                    // --- VACUUM LOGIC (DELIVERY) ---
+                    if (creep.store.getFreeCapacity() > 0) {
+                        const vacDrop = creep.pos.findInRange(allDrops, 1, { filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0 })[0];
+                        const vacTomb = creep.pos.findInRange(allTombstones, 1, { filter: (t: Tombstone) => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
+                        if (vacDrop) creep.pickup(vacDrop);
+                        else if (vacTomb) creep.withdraw(vacTomb, RESOURCE_ENERGY);
+                    }
+                    creep.moveTo(target, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 5 });
+                }
+            } else {
+                const parkTarget = creep.pos.findClosestByRange(mySpawns);
+                if (parkTarget && creep.pos.getRangeTo(parkTarget) > 5) {
+                    creep.moveTo(parkTarget, { range: 5, visualizePathStyle: { stroke: '#ffffff' } });
+                }
+                creep.say('💤 Idle');
             }
         }
 
@@ -85,77 +184,182 @@ export const roleHauler: RoleHandler = {
         else {
             let target: any = null;
 
-            // A. Target Fixation: Check memory
+            const sourceIds = creep.room.memory.sourceIds || [];
+            let activeSources = sourceIds.map(id => Game.getObjectById(id as Id<Source>)).filter(s => s !== null) as Source[];
+            if (activeSources.length === 0) activeSources = creep.room.find(FIND_SOURCES);
+            const isNearSource = (pos: RoomPosition) => activeSources.some(s => pos.inRangeTo(s, 2));
+
+            const towersNeedEnergy = creep.room.find(FIND_MY_STRUCTURES, {
+                filter: s => s.structureType === STRUCTURE_TOWER &&
+                    s.store.getFreeCapacity(RESOURCE_ENERGY) > 0
+            }).length > 0;
+
             if (creep.memory.targetId) {
                 target = Game.getObjectById(creep.memory.targetId as Id<any>);
-                // Validate: still exists and has energy
-                const hasStore = target && 'store' in target && target.store.getUsedCapacity(RESOURCE_ENERGY) > 0;
-                const hasAmount = target && 'amount' in target && target.amount > 0;
-                if (!hasStore && !hasAmount) {
-                    delete creep.memory.targetId;
+
+                // 1. Check if target still has energy
+                const hasEnergy = target && (
+                    ('store' in target && target.store.getUsedCapacity(RESOURCE_ENERGY) > 25) ||
+                    ('amount' in target && target.amount > 0)
+                );
+
+                // 2. Check if a Priority 1 target appeared while we are chasing something else
+                // (Only pre-empt if our current target is NOT already Priority 1)
+                const p1Targets = [
+                    ...allDrops.filter(r => r.resourceType === RESOURCE_ENERGY && r.amount >= 50 && mySpawns.some(s => r.pos.inRangeTo(s, 3))),
+                    ...allTombstones.filter(t => t.store.getUsedCapacity(RESOURCE_ENERGY) >= 50 && t.creep.my && mySpawns.some(s => t.pos.inRangeTo(s, 3)))
+                ];
+
+                const currentTargetIsP1 = target && mySpawns.some(s => target.pos.inRangeTo(s, 3));
+                const targetIsHub = target && (target.structureType === STRUCTURE_STORAGE || target.structureType === STRUCTURE_LINK);
+                const shouldPreempt = p1Targets.length > 0 && !currentTargetIsP1 && !targetIsHub;
+
+                if (!hasEnergy || shouldPreempt) {
                     target = null;
+                    delete creep.memory.targetId;
+                    creep.say('🔄 Reroute');
                 }
             }
 
-            // B. Check for local targets first to clear an area before leaving
             if (!target) {
-                const localDropped = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, {
-                    filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 0
-                })[0];
-                
-                const localContainer = creep.pos.findInRange(FIND_STRUCTURES, 1, {
-                    filter: s => s.structureType === STRUCTURE_CONTAINER && s.store.getUsedCapacity(RESOURCE_ENERGY) > 0
-                })[0];
-                
-                const localTombstone = creep.pos.findInRange(FIND_TOMBSTONES, 1, {
-                    filter: t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0
-                })[0];
+                // PROXIMITY OVERRIDE: If partially full, grab the nearest valid target to fill up quickly
+                if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    const proximityTargets: any[] = [];
+                    const spawns = creep.room.find(FIND_MY_SPAWNS);
 
-                const localTerminal = creep.pos.findInRange(FIND_STRUCTURES, 1, {
-                    filter: s => s.structureType === STRUCTURE_TERMINAL && !s.my && s.store.getUsedCapacity(RESOURCE_ENERGY) > 0
-                })[0];
+                    for (const spawn of spawns) {
+                        proximityTargets.push(...allDrops.filter(r => r.resourceType === RESOURCE_ENERGY && r.amount >= 50 && r.pos.inRangeTo(spawn, 3)));
+                        proximityTargets.push(...allTombstones.filter(t => t.store.getUsedCapacity(RESOURCE_ENERGY) >= 50 && t.creep.my && t.pos.inRangeTo(spawn, 3)));
+                    }
 
-                if (localDropped) target = localDropped;
-                else if (localTombstone) target = localTombstone;
-                else if (localContainer) target = localContainer;
-                else if (localTerminal) target = localTerminal;
+                    proximityTargets.push(...allDrops.filter(r => r.resourceType === RESOURCE_ENERGY && r.amount > 50 && isNearSource(r.pos)));
+                    proximityTargets.push(...allContainers.filter(s => s.store.getUsedCapacity(RESOURCE_ENERGY) > 150 && isNearSource(s.pos)));
 
-                if (target) {
-                    creep.memory.targetId = target.id;
+                    if (creep.room.memory.storageLink) {
+                        const storageLink = Game.getObjectById(creep.room.memory.storageLink as Id<StructureLink>);
+                        const hasSourceLink = !!creep.room.memory.sourceLink1 || !!creep.room.memory.sourceLink2;
+                        if (storageLink && hasSourceLink && storageLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                            proximityTargets.push(storageLink);
+                        }
+                    }
+
+                    if (creep.room.memory.dismantleMiningTarget) {
+                        const dismantleTarget = Game.getObjectById(creep.room.memory.dismantleMiningTarget as Id<Structure>);
+                        if (dismantleTarget) {
+                            proximityTargets.push(...allContainers.filter(s => s.store.getUsedCapacity(RESOURCE_ENERGY) >= 150 && s.pos.inRangeTo(dismantleTarget, 2)));
+                        }
+                    }
+
+                    if (proximityTargets.length > 0) {
+                        target = creep.pos.findClosestByRange(proximityTargets);
+                    }
                 }
             }
 
-            // C. If STILL no target, but we have some energy, go deliver it!
-            // This prevents wandering to another source when partially full.
-            if (!target && creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                creep.memory.working = true;
-                creep.say('📦 Deposit');
-                return;
-            }
-
-            // D. Find New Target Globally
+            // STRICT PRIORITIES: Used if empty, or if proximity override found nothing
             if (!target) {
-                // Priority 1: Dropped energy near sources (Overflow)
-                const overflowEnergy = creep.room.find(FIND_DROPPED_RESOURCES, {
-                    filter: r => r.resourceType === RESOURCE_ENERGY && 
-                                 r.amount > 50 && // Prioritize smaller overflow
-                                 r.pos.findInRange(FIND_SOURCES, 2).length > 0
-                });
+                // Priority 0.5: Proactive Base Hub Check (Links)
+                // If in the base area, handle Link siphoning/feeding before walking away
+                if (creep.room.storage && creep.pos.inRangeTo(creep.room.storage, 5)) {
+                    if (creep.room.memory.storageLink) {
+                        const storageLink = Game.getObjectById(creep.room.memory.storageLink as Id<StructureLink>);
+                        const hasSourceLink = !!creep.room.memory.sourceLink1 || !!creep.room.memory.sourceLink2;
 
-                if (overflowEnergy.length > 0) {
-                    target = creep.pos.findClosestByPath(overflowEnergy);
+                        if (storageLink) {
+                            // A: Siphon (Link -> Storage)
+                            if (hasSourceLink && storageLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                                target = storageLink;
+                            }
+                            // B: Feed (Storage -> Link)
+                            else if (!hasSourceLink && creep.room.memory.controllerLink && storageLink.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                                if (this.shuttleCheck(creep.room) && creep.room.storage.store[RESOURCE_ENERGY] > 0) {
+                                    target = creep.room.storage;
+                                }
+                            }
+                        }
+                    }
                 }
 
-                // Priority 2: Other candidates (Tombstones, regular dropped, containers)
+                // Priority 1: Tombstones and dropped energy near Spawns
+                const nearbyDrops: any[] = [];
+                for (const spawn of mySpawns) {
+                    nearbyDrops.push(...allDrops.filter(r => r.resourceType === RESOURCE_ENERGY && r.amount >= 50 && r.pos.inRangeTo(spawn, 3)));
+                    nearbyDrops.push(...allTombstones.filter(t => t.store.getUsedCapacity(RESOURCE_ENERGY) >= 50 && t.creep.my && t.pos.inRangeTo(spawn, 3)));
+                }
+                if (nearbyDrops.length > 0) {
+                    target = creep.pos.findClosestByRange(nearbyDrops);
+                }
+
+                // Priority 1.5: Hub Refill (Storage -> Spawns/Extensions)
+                // If near storage and base needs energy, pull from storage now
+                if (!target && creep.room.storage && creep.pos.inRangeTo(creep.room.storage, 5)) {
+                    if (creep.room.storage.store[RESOURCE_ENERGY] > 0 && (!this.shuttleCheck(creep.room) || towersNeedEnergy)) {
+                        target = creep.room.storage;
+                    }
+                }
+
+                // Priority 2: Dropped energy near sources (Massive Overflow)
                 if (!target) {
-                    const candidates = this.getCollectionCandidates(creep);
-                    target = creep.pos.findClosestByPath(candidates);
+                    const drops = allDrops.filter(r => r.resourceType === RESOURCE_ENERGY && r.amount > 50 && isNearSource(r.pos));
+                    if (drops.length > 0) {
+                        target = creep.pos.findClosestByRange(drops);
+                    }
                 }
 
-                // Priority 3: Storage Fallback
+                // Priority 2.5: Containers near sources
+                if (!target) {
+                    const containers = allContainers.filter(s => s.store.getUsedCapacity(RESOURCE_ENERGY) > 150 && isNearSource(s.pos));
+                    if (containers.length > 0) {
+                        target = containers.sort((a, b) => b.store.getUsedCapacity(RESOURCE_ENERGY) - a.store.getUsedCapacity(RESOURCE_ENERGY))[0];
+                    }
+                }
+
+                // Priority 3: storageLink siphoning (Link -> Storage)
+                if (!target && creep.room.memory.storageLink) {
+                    const storageLink = Game.getObjectById(creep.room.memory.storageLink as Id<StructureLink>);
+                    const hasSourceLink = !!creep.room.memory.sourceLink1 || !!creep.room.memory.sourceLink2;
+
+                    if (storageLink && hasSourceLink && storageLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        target = storageLink;
+                    }
+                }
+
+                // Priority 4: Dismantle Mining Containers
+                if (!target && creep.room.memory.dismantleMiningTarget) {
+                    const dismantleTarget = Game.getObjectById(creep.room.memory.dismantleMiningTarget as Id<Structure>);
+                    if (dismantleTarget) {
+                        const dismantleContainers = allContainers.filter(s => s.store.getUsedCapacity(RESOURCE_ENERGY) >= 150 && s.pos.inRangeTo(dismantleTarget, 2));
+                        if (dismantleContainers.length > 0) {
+                            target = dismantleContainers.sort((a, b) => b.store.getUsedCapacity(RESOURCE_ENERGY) - a.store.getUsedCapacity(RESOURCE_ENERGY))[0];
+                        }
+                    }
+                }
+
+                // Priority 5: General room.storage fallback
+                // ONLY pull from storage if we actually have a destination that needs it (Spawns/Extensions/Towers)
                 if (!target && creep.room.storage && creep.room.storage.store[RESOURCE_ENERGY] > 0) {
-                    const needsEnergy = this.roomNeedsEnergy(creep.room);
-                    if (needsEnergy) target = creep.room.storage;
+                    if (!this.shuttleCheck(creep.room) || towersNeedEnergy) {
+                        target = creep.room.storage;
+                    }
+                }
+
+                // Priority 5.5: Feed Link Network from Storage (Storage -> Link -> Controller)
+                if (!target && creep.room.storage && creep.room.storage.store[RESOURCE_ENERGY] > 0 && creep.room.memory.storageLink) {
+                    const storageLink = Game.getObjectById(creep.room.memory.storageLink as Id<StructureLink>);
+                    const hasSourceLink = !!creep.room.memory.sourceLink1 || !!creep.room.memory.sourceLink2;
+                    const linkNeedsEnergy = !hasSourceLink && creep.room.memory.controllerLink && storageLink && storageLink.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
+
+                    if (linkNeedsEnergy) {
+                        target = creep.room.storage;
+                    }
+                }
+
+                // Priority 6: Other random tombstones map-wide (Only MY tombstones)
+                if (!target) {
+                    const otherTombstones = allTombstones.filter(t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 && t.creep.my);
+                    if (otherTombstones.length > 0) {
+                        target = creep.pos.findClosestByRange(otherTombstones);
+                    }
                 }
 
                 if (target) {
@@ -165,31 +369,105 @@ export const roleHauler: RoleHandler = {
 
             if (target) {
                 if (creep.pos.getRangeTo(target) > 1) {
+                    // --- VACUUM LOGIC (COLLECTION) ---
+                    if (creep.store.getFreeCapacity() > 0) {
+                        const vacDrop = creep.pos.findInRange(allDrops, 1, { filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0 })[0];
+                        const vacTomb = creep.pos.findInRange(allTombstones, 1, { filter: (t: Tombstone) => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
+                        
+                        if (vacDrop) {
+                            creep.pickup(vacDrop);
+                            if (creep.store.getUsedCapacity() + vacDrop.amount >= creep.store.getCapacity()) {
+                                creep.memory.working = true;
+                                delete creep.memory.targetId;
+                                creep.say('📦 Full!');
+                            }
+                        } else if (vacTomb) {
+                            creep.withdraw(vacTomb, RESOURCE_ENERGY);
+                            if (creep.store.getUsedCapacity() + vacTomb.store.getUsedCapacity(RESOURCE_ENERGY) >= creep.store.getCapacity()) {
+                                creep.memory.working = true;
+                                delete creep.memory.targetId;
+                                creep.say('📦 Full!');
+                            }
+                        }
+                    }
                     creep.moveTo(target, { visualizePathStyle: { stroke: '#ffaa00' }, reusePath: 10 });
                 } else {
-                    // --- MULTI-PICKUP LOGIC ---
-                    
-                    // A. Always check for dropped energy at our feet/nearby first
-                    const droppedNearby = creep.pos.findInRange(FIND_DROPPED_RESOURCES, 1, {
-                        filter: r => r.resourceType === RESOURCE_ENERGY
-                    })[0];
+                    // Local area clear logic - using cached arrays for efficiency
+                    const localDropped = creep.pos.findInRange(allDrops, 1, { filter: (r: Resource) => r.resourceType === RESOURCE_ENERGY && r.amount > 0 })[0];
+                    const localTombstone = creep.pos.findInRange(allTombstones, 1, { filter: (t: Tombstone) => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
+                    const localContainer = creep.pos.findInRange(allContainers, 1, { filter: (s: StructureContainer) => s.store.getUsedCapacity(RESOURCE_ENERGY) > 0 })[0];
 
-                    if (droppedNearby) {
-                        creep.pickup(droppedNearby);
+                    let actionResult: number = ERR_NOT_IN_RANGE;
+
+                    // PRIORITY: 
+                    // 1. Large drops (prevent decay/loss)
+                    // 2. Tombstones (urgent)
+                    // 3. Substantial containers (fill up fast)
+                    // 4. Any remaining drops
+                    if (localDropped && localDropped.amount > 100) {
+                        actionResult = creep.pickup(localDropped);
+                    } else if (localTombstone) {
+                        actionResult = creep.withdraw(localTombstone, RESOURCE_ENERGY);
+                    } else if (localContainer && localContainer.store.getUsedCapacity(RESOURCE_ENERGY) > 100) {
+                        actionResult = creep.withdraw(localContainer, RESOURCE_ENERGY);
+                    } else if (localDropped) {
+                        actionResult = creep.pickup(localDropped);
                     } else if ('store' in target) {
-                        creep.withdraw(target, RESOURCE_ENERGY);
+                        actionResult = creep.withdraw(target, RESOURCE_ENERGY);
                     } else if ('amount' in target) {
-                        creep.pickup(target);
+                        actionResult = creep.pickup(target);
+                    }
+
+                    if (actionResult === OK && !localDropped && !localTombstone) {
+                        const targetStructure = target as Structure;
+                        const targetResource = target as Resource;
+                        const isMostlyFull = creep.store.getUsedCapacity(RESOURCE_ENERGY) >= creep.store.getCapacity() * 0.8;
+                        const isSourceContainer = targetStructure.structureType === STRUCTURE_CONTAINER && isNearSource(targetStructure.pos);
+                        const isStorage = targetStructure.structureType === STRUCTURE_STORAGE;
+                        const isStorageLink = targetStructure.structureType === STRUCTURE_LINK && targetStructure.id === creep.room.memory.storageLink;
+                        const isSourceDrop = targetResource.resourceType === RESOURCE_ENERGY && isNearSource(targetResource.pos);
+
+                        if (isSourceContainer || isStorage || isStorageLink) {
+                            const storeStructure = targetStructure as StructureContainer;
+                            if (isMostlyFull || storeStructure.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
+                                creep.memory.working = true;
+                                delete creep.memory.targetId;
+                            }
+                        }
+
+                        if (isSourceDrop) {
+                            if (isMostlyFull) {
+                                creep.memory.working = true;
+                            }
+                            delete creep.memory.targetId;
+                        }
                     }
                 }
             } else {
-                // IDLE
-                const parkTarget = creep.pos.findClosestByPath(FIND_STRUCTURES, {
-                    filter: (s) => s.structureType === STRUCTURE_CONTAINER && s.pos.findInRange(FIND_SOURCES, 2).length > 0
-                }) || creep.pos.findClosestByPath(FIND_SOURCES);
+                if (creep.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                    const isMostlyFull = creep.store.getUsedCapacity(RESOURCE_ENERGY) >= creep.store.getCapacity() * 0.8;
+                    const hasMinEnergy = creep.store.getUsedCapacity(RESOURCE_ENERGY) >= 50;
+                    const towersBelow90 = creep.room.find(FIND_MY_STRUCTURES, {
+                        filter: s => s.structureType === STRUCTURE_TOWER &&
+                            s.store.getUsedCapacity(RESOURCE_ENERGY) < (s.store.getCapacity(RESOURCE_ENERGY) * 0.9)
+                    }).length > 0;
 
-                if (parkTarget) {
-                    if (creep.pos.getRangeTo(parkTarget) > 5) {
+                    // Only deliver if mostly full, or if we have at least 50 energy and the room is in critical need,
+                    // OR if we have at least 50 energy and any towers are below 90%
+                    if (isMostlyFull || (hasMinEnergy && !this.shuttleCheck(creep.room)) || (hasMinEnergy && towersBelow90)) {
+                        creep.memory.working = true;
+                        creep.say('📦 Deliver');
+                    } else {
+                        const parkTarget = creep.pos.findClosestByRange(mySpawns);
+                        if (parkTarget && creep.pos.getRangeTo(parkTarget) > 5) {
+                            creep.moveTo(parkTarget, { range: 5, visualizePathStyle: { stroke: '#ffaa00' } });
+                        }
+                        creep.say('💤 Idle');
+                        creep.say('⌛ Waiting');
+                    }
+                } else {
+                    const parkTarget = creep.pos.findClosestByRange(mySpawns);
+                    if (parkTarget && creep.pos.getRangeTo(parkTarget) > 5) {
                         creep.moveTo(parkTarget, { range: 5, visualizePathStyle: { stroke: '#ffaa00' } });
                     }
                     creep.say('💤 Idle');
@@ -199,39 +477,24 @@ export const roleHauler: RoleHandler = {
     },
 
     /**
-     * Helper to get all valid collection targets
+     * Helper to check if conditions are met to start link shuttling
+     * Rule: Spawns/Extensions are full AND Towers are at least 50%
      */
-    getCollectionCandidates(creep: Creep): (Resource | Tombstone | StructureContainer | StructureTerminal)[] {
-        return [
-            ...creep.room.find(FIND_TOMBSTONES, { filter: t => t.store.getUsedCapacity(RESOURCE_ENERGY) > 0 }),
-            ...creep.room.find(FIND_DROPPED_RESOURCES, { filter: r => r.resourceType === RESOURCE_ENERGY && r.amount > 20 }),
-            ...creep.room.find(FIND_STRUCTURES, {
-                filter: (s) => s.structureType === STRUCTURE_CONTAINER &&
-                    s.store.getUsedCapacity(RESOURCE_ENERGY) >= 150 &&
-                    (!creep.room.controller || !s.pos.inRangeTo(creep.room.controller, 4))
-            }) as StructureContainer[],
-            ...creep.room.find(FIND_STRUCTURES, {
-                filter: (s) => s.structureType === STRUCTURE_TERMINAL &&
-                    !s.my && s.store.getUsedCapacity(RESOURCE_ENERGY) > 0
-            }) as StructureTerminal[]
-        ];
+    shuttleCheck(room: Room): boolean {
+        if (room.energyAvailable < room.energyCapacityAvailable) return false;
+
+        const towersLow = room.find(FIND_MY_STRUCTURES, {
+            filter: (s) => s.structureType === STRUCTURE_TOWER &&
+                s.store.getUsedCapacity(RESOURCE_ENERGY) < (s.store.getCapacity(RESOURCE_ENERGY) * 0.5)
+        }).length > 0;
+
+        return !towersLow;
     },
 
     /**
-     * Helper to check if room needs energy in spawns/extensions/towers
+     * Specific check for Spawns and Extensions
      */
-    roomNeedsEnergy(room: Room): boolean {
-        return room.find(FIND_MY_STRUCTURES, {
-            filter: (s) => {
-                if (s.structureType === STRUCTURE_EXTENSION || s.structureType === STRUCTURE_SPAWN) {
-                    return s.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
-                }
-                if (s.structureType === STRUCTURE_TOWER) {
-                    return s.store.getUsedCapacity(RESOURCE_ENERGY) < (s.store.getCapacity(RESOURCE_ENERGY) * 0.5) ||
-                           s.store.getFreeCapacity(RESOURCE_ENERGY) > 100;
-                }
-                return false;
-            }
-        }).length > 0;
+    roomSpawnsNeedEnergy(room: Room): boolean {
+        return room.energyAvailable < room.energyCapacityAvailable;
     }
 };

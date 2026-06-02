@@ -1,4 +1,4 @@
-import { COLONY_SETTINGS } from '../config.creeps';
+import { COLONY_SETTINGS } from '../config/settings';
 
 export const roleMiner: RoleHandler = {
     run(creep: Creep): void {
@@ -36,7 +36,7 @@ export const roleMiner: RoleHandler = {
         }
 
         if (!activeSource || COLONY_SETTINGS.ignoredSources.includes(activeSource.id as any)) {
-            activeSource = creep.pos.findClosestByPath(FIND_SOURCES, {
+            activeSource = creep.pos.findClosestByRange(FIND_SOURCES, {
                 filter: (s) => !COLONY_SETTINGS.ignoredSources.includes(s.id as any) && s.pos.roomName === creep.room.name
             });
             if (COLONY_SETTINGS.debug) {
@@ -50,9 +50,9 @@ export const roleMiner: RoleHandler = {
         const container = activeSource.pos.findInRange<StructureContainer>(FIND_STRUCTURES, 1, {
             filter: s => s.structureType === STRUCTURE_CONTAINER
         })[0];
-        const link = activeSource.pos.findInRange<StructureLink>(FIND_MY_STRUCTURES, 2, {
+        const link = container ? container.pos.findInRange<StructureLink>(FIND_MY_STRUCTURES, 1, {
             filter: s => s.structureType === STRUCTURE_LINK
-        })[0];
+        })[0] : null;
 
         // --- 5. STATIC CANISTER MINER (If Container Exists) ---
         if (container) {

@@ -1,6 +1,6 @@
 import { COLONY_SETTINGS } from '../config/settings';
 
-export const roleRemoteBuilder: RoleHandler = {
+export const roleRemoteRepairer: RoleHandler = {
     run(creep: Creep): void {
         const targetRoom = creep.memory.targetRoom;
         
@@ -8,7 +8,7 @@ export const roleRemoteBuilder: RoleHandler = {
         if (targetRoom && creep.room.name !== targetRoom) {
             creep.moveTo(new RoomPosition(25, 25, targetRoom), { 
                 range: 20,
-                visualizePathStyle: { stroke: '#ff00ff', lineStyle: 'dashed' } 
+                visualizePathStyle: { stroke: '#00ff00', lineStyle: 'dashed' } 
             });
             creep.say('🏃 remote');
             return;
@@ -23,36 +23,42 @@ export const roleRemoteBuilder: RoleHandler = {
         if (!creep.memory.working && creep.store.getFreeCapacity() === 0) {
             creep.memory.working = true;
             delete creep.memory.targetId;
-            creep.say('🚧 build');
+            creep.say('🔧 repair');
         }
 
         // 3. Logic Execution
         if (creep.memory.working) {
-            // --- PRIORITY 1: Construction Sites ---
-            const site = creep.pos.findClosestByRange(FIND_CONSTRUCTION_SITES);
-            if (site) {
-                if (creep.build(site) === ERR_NOT_IN_RANGE) {
-                    creep.moveTo(site, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 10 });
+            // --- PRIORITY 1: Repair Roads and Containers ---
+            let target = Game.getObjectById(creep.memory.targetId as Id<Structure>);
+
+            if (!target || target.hits === target.hitsMax) {
+                const damagedStructure = creep.room.find(FIND_STRUCTURES, {
+                    filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_ROAD) && 
+                                    s.hits < s.hitsMax * 0.9
+                });
+                
+                // Sort by hits to prioritize most damaged
+                damagedStructure.sort((a, b) => a.hits - b.hits);
+                target = damagedStructure[0];
+                
+                if (target) {
+                    creep.memory.targetId = target.id;
                 }
-                return; 
             }
 
-            // --- PRIORITY 2: Repair ---
-            const damagedStructure = creep.pos.findClosestByRange(FIND_STRUCTURES, {
-                filter: (s) => (s.structureType === STRUCTURE_CONTAINER || s.structureType === STRUCTURE_ROAD) && 
-                                s.hits < s.hitsMax * 0.9
-            });
-            if (damagedStructure) {
-                if (creep.repair(damagedStructure) === ERR_NOT_IN_RANGE) {
-                    creep.moveTo(damagedStructure, { visualizePathStyle: { stroke: '#ff0000' } });
+            if (target) {
+                if (creep.repair(target) === ERR_NOT_IN_RANGE) {
+                    creep.moveTo(target, { visualizePathStyle: { stroke: '#00ff00' }, reusePath: 10 });
                 }
-                return;
-            }
-
-            // --- PRIORITY 3: Upgrade Controller (Fallback) ---
-            if (creep.room.controller) {
-                if (creep.upgradeController(creep.room.controller) === ERR_NOT_IN_RANGE) {
-                    creep.moveTo(creep.room.controller, { visualizePathStyle: { stroke: '#ffffff' }, reusePath: 10 });
+            } else {
+                // No repairs? Fallback to construction sites
+                const site = creep.pos.findClosestByRange(FIND_CONSTRUCTION_SITES);
+                if (site) {
+                    if (creep.build(site) === ERR_NOT_IN_RANGE) {
+                        creep.moveTo(site, { visualizePathStyle: { stroke: '#ffffff' } });
+                    }
+                } else {
+                    creep.say('💤 idle');
                 }
             }
             
