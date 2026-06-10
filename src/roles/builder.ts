@@ -219,7 +219,7 @@ export const roleBuilder: RoleHandler = {
             }
 
             if (!target) {
-                // Priority 3: room.storage if there is energy in it
+                // Priority 3: room.storage if there is energy in it, else room.terminal if it has energy
                 const storage = creep.room.storage;
                 if (storage && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                     const path = creep.room.findPath(creep.pos, storage.pos, { ignoreCreeps: true, maxOps: 200 });
@@ -227,6 +227,16 @@ export const roleBuilder: RoleHandler = {
                     if (isReachable || creep.pos.isNearTo(storage.pos)) {
                         target = storage;
                         creep.memory.targetId = target.id;
+                    }
+                } else {
+                    const terminal = creep.room.terminal;
+                    if (terminal && terminal.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        const path = creep.room.findPath(creep.pos, terminal.pos, { ignoreCreeps: true, maxOps: 200 });
+                        const isReachable = path.length > 0 && path[path.length - 1].x === terminal.pos.x && path[path.length - 1].y === terminal.pos.y;
+                        if (isReachable || creep.pos.isNearTo(terminal.pos)) {
+                            target = terminal;
+                            creep.memory.targetId = target.id;
+                        }
                     }
                 }
             }

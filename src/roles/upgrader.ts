@@ -30,7 +30,7 @@ export const roleUpgrader: RoleHandler = {
 
         // 3. State Management
         const hasLocalEnergy = (container && container.store[RESOURCE_ENERGY] > 0) || (link && link.store[RESOURCE_ENERGY] > 0);
-        
+
         if (creep.memory.working && creep.store[RESOURCE_ENERGY] === 0 && !hasLocalEnergy) {
             creep.memory.working = false;
             creep.say('🔍 Fetch');
@@ -46,7 +46,7 @@ export const roleUpgrader: RoleHandler = {
             // - If we are on the container, stay there.
             // - If we aren't, move to range 1 of the container/link (or range 0 if it's empty).
             const onSpot = container && creep.pos.isEqualTo(container.pos);
-            
+
             if (container && !onSpot) {
                 // Try to get on the container, but don't get stuck if it's occupied
                 const isOccupied = container.pos.lookFor(LOOK_CREEPS).length > 0;
@@ -72,7 +72,7 @@ export const roleUpgrader: RoleHandler = {
         } else {
             // Refill Phase: Go to the nearest non-controller container or storage
             let target = Game.getObjectById(creep.memory.targetId as Id<StructureStorage | StructureContainer>);
-            
+
             if (!target || target.store.getUsedCapacity(RESOURCE_ENERGY) === 0) {
                 if (creep.room.storage && creep.room.storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                     target = creep.room.storage;
