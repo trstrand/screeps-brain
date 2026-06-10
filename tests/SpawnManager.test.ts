@@ -275,4 +275,50 @@ describe('SpawnManager', () => {
         const remoteCall = mockSpawn.spawnCreep.mock.calls.find(call => call[1].startsWith('remoteExtractorMiner'));
         expect(remoteCall).toBeDefined();
     });
+
+    it('should skip marketHauler if the room does not have a terminal', () => {
+        // Satisfy all other quotas
+        (Game as any).creeps = {
+            'miner1': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 0 } },
+            'miner2': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 1 } },
+            'hauler1': { memory: { role: 'hauler', homeRoom: 'E1N1' } },
+            'hauler2': { memory: { role: 'hauler', homeRoom: 'E1N1' } },
+            'upgrader1': { memory: { role: 'upgrader', homeRoom: 'E1N1' } }
+        } as any;
+
+        COLONY_SETTINGS.roomQuotas['E1N1'].marketHauler = 1;
+        
+        // No terminal in mockRoom
+        mockRoom.terminal = undefined as any;
+
+        SpawnManager.run(mockRoom as any);
+
+        const marketHaulerCall = mockSpawn.spawnCreep.mock.calls.find(call => call[1].startsWith('marketHauler'));
+        expect(marketHaulerCall).toBeUndefined();
+    });
+
+    it('should spawn marketHauler and set emptyTerminal to false in memory if terminal exists', () => {
+        // Satisfy all other quotas
+        (Game as any).creeps = {
+            'miner1': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 0 } },
+            'miner2': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 1 } },
+            'hauler1': { memory: { role: 'hauler', homeRoom: 'E1N1' } },
+            'hauler2': { memory: { role: 'hauler', homeRoom: 'E1N1' } },
+            'upgrader1': { memory: { role: 'upgrader', homeRoom: 'E1N1' } }
+        } as any;
+
+        COLONY_SETTINGS.roomQuotas['E1N1'].marketHauler = 1;
+        
+        // Terminal exists in mockRoom
+        mockRoom.terminal = { id: 'terminal1' } as any;
+
+        SpawnManager.run(mockRoom as any);
+
+        const marketHaulerCall = mockSpawn.spawnCreep.mock.calls.find(call => call[1].startsWith('marketHauler'));
+        expect(marketHaulerCall).toBeDefined();
+        expect(marketHaulerCall![2].memory).toMatchObject({
+            role: 'marketHauler',
+            emptyTerminal: false
+        });
+    });
 });

@@ -211,28 +211,15 @@ export class SpawnManager {
                 }
             }
             if (role === 'marketHauler' && targetCount > 0) {
-                const hasExtractor = room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTRACTOR } }).length > 0;
-                const mineral = room.find(FIND_MINERALS)[0];
-                const quota = COLONY_SETTINGS.mineralQuotas[room.name];
-                let needsMinerals = false;
-                if (hasExtractor && mineral && quota !== undefined && room.storage) {
-                    const currentStock = room.storage.store.getUsedCapacity(mineral.mineralType);
-                    if (currentStock < quota) needsMinerals = true;
-                }
-
-                const transfers = (COLONY_SETTINGS.terminalTransfers && COLONY_SETTINGS.terminalTransfers[room.name]) || [];
-                const terminal = room.terminal;
-                const storage = room.storage;
-                let hasPendingTransfers = false;
-                if (terminal && storage && transfers.length > 0) {
-                    hasPendingTransfers = transfers.some(t => (terminal.store[t.resource] || 0) < t.amount && (storage.store[t.resource] || 0) > 0);
-                }
-
-                if (!needsMinerals && !hasPendingTransfers) targetCount = 0;
+                if (!room.terminal) targetCount = 0;
             }
 
             if (roleCount < targetCount) {
                 let memory: any = { ...baseMem, role };
+
+                if (role === 'marketHauler') {
+                    memory.emptyTerminal = false;
+                }
 
                 // Specific setup for roles
                 if (role === 'miner') {
