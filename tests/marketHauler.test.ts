@@ -217,4 +217,77 @@ describe('Role: MarketHauler', () => {
         expect(mockCreep.pickup).toHaveBeenCalledWith(mockNearbyDrop);
         expect(mockCreep.moveTo).toHaveBeenCalledWith(mockTower, expect.any(Object));
     });
+
+    describe('emptyTerminal flag', () => {
+        it('should target terminal and withdraw resources when emptyTerminal is true', () => {
+            mockCreep.memory.working = false;
+            mockCreep.memory.emptyTerminal = true;
+            mockCreep.store.getUsedCapacity.mockReturnValue(0);
+
+            const mockTerminal = {
+                id: 'terminal1' as Id<any>,
+                structureType: 'terminal',
+                store: {
+                    energy: 1000,
+                    getUsedCapacity: () => 1000
+                }
+            };
+            mockCreep.room.terminal = mockTerminal as any;
+
+            roleMarketHauler.run(mockCreep);
+
+            expect(mockCreep.memory.targetId).toBe('terminal1');
+            expect(mockCreep.moveTo).toHaveBeenCalledWith(mockTerminal, expect.any(Object));
+        });
+
+        it('should deliver resources directly to storage when emptyTerminal is true and carrying resources', () => {
+            mockCreep.memory.working = true;
+            mockCreep.memory.emptyTerminal = true;
+            mockCreep.store.getUsedCapacity.mockReturnValue(100);
+            mockCreep.store.energy = 100;
+
+            const mockStorage = {
+                id: 'storage1' as Id<any>,
+                structureType: 'storage',
+                store: {
+                    getUsedCapacity: vi.fn().mockReturnValue(0)
+                }
+            };
+            mockCreep.room.storage = mockStorage as any;
+            mockCreep.transfer = vi.fn().mockReturnValue(OK);
+
+            roleMarketHauler.run(mockCreep);
+
+            expect(mockCreep.transfer).toHaveBeenCalledWith(mockStorage, 'energy');
+        });
+
+        it('should idle and not recycle when emptyTerminal is true but terminal has no resources', () => {
+            mockCreep.memory.working = false;
+            mockCreep.memory.emptyTerminal = true;
+            mockCreep.store.getUsedCapacity.mockReturnValue(0);
+
+            const mockTerminal = {
+                id: 'terminal1' as Id<any>,
+                structureType: 'terminal',
+                store: {
+                    energy: 0,
+                    getUsedCapacity: () => 0
+                }
+            };
+            const mockStorage = {
+                id: 'storage1' as Id<any>,
+                structureType: 'storage',
+                store: {
+                    getUsedCapacity: vi.fn().mockReturnValue(0)
+                }
+            };
+            mockCreep.room.terminal = mockTerminal as any;
+            mockCreep.room.storage = mockStorage as any;
+
+            roleMarketHauler.run(mockCreep);
+
+            expect(mockCreep.memory.recycle).toBeUndefined();
+            expect(mockCreep.moveTo).toHaveBeenCalledWith(mockStorage, expect.any(Object));
+        });
+    });
 });

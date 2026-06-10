@@ -77,8 +77,16 @@ export const roleMarketHauler: RoleHandler = {
             const carrying = Object.keys(creep.store).find(res => creep.store[res as ResourceConstant] > 0) as ResourceConstant | undefined;
 
             if (carrying) {
+                // emptyTerminal Priority: Transfer everything directly to storage
+                if (creep.memory.emptyTerminal && storage) {
+                    if (creep.transfer(storage, carrying) === ERR_NOT_IN_RANGE) {
+                        moveWithSweeper(creep, storage, { visualizePathStyle: { stroke: '#ffffff' } });
+                    }
+                    delivered = true;
+                }
+
                 // Priority 0.5: Tower Delivery
-                if (carrying === RESOURCE_ENERGY && creep.memory.deliveryTargetId) {
+                if (!delivered && carrying === RESOURCE_ENERGY && creep.memory.deliveryTargetId) {
                     const tower = Game.getObjectById(creep.memory.deliveryTargetId) as StructureTower | null;
                     if (tower && tower.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
                         if (creep.transfer(tower, RESOURCE_ENERGY) === ERR_NOT_IN_RANGE) {
@@ -122,103 +130,126 @@ export const roleMarketHauler: RoleHandler = {
             const storage = creep.room.storage;
             const transfers = (COLONY_SETTINGS.terminalTransfers && COLONY_SETTINGS.terminalTransfers[creep.room.name]) || [];
 
-            // Priority 1: Reachable Dropped Resources or Energy on the Ground
-            const dropped = creep.room.find(FIND_DROPPED_RESOURCES);
-            if (dropped.length > 0) {
-                let remainingDrops = [...dropped];
-                while (remainingDrops.length > 0) {
-                    const closest = creep.pos.findClosestByRange(remainingDrops);
-                    if (!closest) break;
-
-                    const path = creep.room.findPath(creep.pos, closest.pos, { ignoreCreeps: true, maxOps: 200 });
-                    const isReachable = path.length > 0 && path[path.length - 1].x === closest.pos.x && path[path.length - 1].y === closest.pos.y;
-
-                    if (isReachable || creep.pos.isNearTo(closest.pos)) {
-                        target = closest;
-                        resourceToFetch = closest.resourceType;
-                        break;
-                    } else {
-                        const index = remainingDrops.indexOf(closest);
-                        if (index > -1) remainingDrops.splice(index, 1);
+            // If emptyTerminal is true, we ONLY fetch from terminal
+            if (creep.memory.emptyTerminal) {
+                if (terminal) {
+                    const terminalResources = Object.keys(terminal.store) as ResourceConstant[];
+                    const firstResource = terminalResources.find(res => terminal.store[res] > 0);
+                    if (firstResource) {
+                        target = terminal;
+                        resourceToFetch = firstResource;
                     }
                 }
-            }
+            } else {
+                // Priority 1: Reachable Dropped Resources or Energy on the Ground
+                const dropped = creep.room.find(FIND_DROPPED_RESOURCES);
+                if (dropped.length > 0) {
+                    let remainingDrops = [...dropped];
+                    while (remainingDrops.length > 0) {
+                        const closest = creep.pos.findClosestByRange(remainingDrops);
+                        if (!closest) break;
 
-            // Priority 2: Terminal Transfers (Storage -> Terminal)
-            if (!target && terminal && storage) {
-                for (const transfer of transfers) {
-                    const currentInTerminal = terminal.store[transfer.resource] || 0;
-                    if (currentInTerminal < transfer.amount) {
-                        const amountInStorage = storage.store[transfer.resource] || 0;
-                        if (amountInStorage > 0) {
-                            target = storage;
-                            resourceToFetch = transfer.resource;
+                        const path = creep.room.findPath(creep.pos, closest.pos, { ignoreCreeps: true, maxOps: 200 });
+                        const isReachable = path.length > 0 && path[path.length - 1].x === closest.pos.x && path[path.length - 1].y === closest.pos.y;
+
+                        if (isReachable || creep.pos.isNearTo(closest.pos)) {
+                            target = closest;
+                            resourceToFetch = closest.resourceType;
                             break;
+                        } else {
+                            const index = remainingDrops.indexOf(closest);
+                            if (index > -1) remainingDrops.splice(index, 1);
                         }
+                    }
+                }
+
+                // Priority 2: Terminal Transfers (Storage -> Terminal)
+                if (!target && terminal && storage) {
+                    for (const transfer of transfers) {
+                        const currentInTerminal = terminal.store[transfer.resource] || 0;
+                        if (currentInTerminal < transfer.amount) {
+                            const amountInStorage = storage.store[transfer.resource] || 0;
+                            if (amountInStorage > 0) {
+                                target = storage;
+                                resourceToFetch = transfer.resource;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Priority 3: Extractor Minerals
+                const extractor = creep.room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTRACTOR } })[0];
+                const mineral = creep.room.find(FIND_MINERALS)[0];
+                const quota = COLONY_SETTINGS.mineralQuotas[creep.room.name];
+                let needsMinerals = false;
+                if (extractor && mineral && quota !== undefined && creep.room.storage) {
+                    const currentStock = creep.room.storage.store.getUsedCapacity(mineral.mineralType);
+                    if (currentStock < quota) needsMinerals = true;
+                }
+
+                if (!target && needsMinerals && extractor) {
+                    // Check ground drops near extractor (minerals)
+                    const drops = creep.room.find(FIND_DROPPED_RESOURCES, {
+                        filter: r => r.resourceType !== RESOURCE_ENERGY && r.pos.inRangeTo(extractor, 1)
+                    });
+
+                    if (drops.length > 0) {
+                        target = drops[0];
+                    }
+
+                    // Check container near extractor
+                    if (!target) {
+                        const container = extractor.pos.findInRange(FIND_STRUCTURES, 1, {
+                            filter: s => s.structureType === STRUCTURE_CONTAINER
+                        })[0] as StructureContainer;
+
+                        if (container) {
+                            const specialMineral = Object.keys(container.store).find(res => res !== RESOURCE_ENERGY) as ResourceConstant;
+                            // Only fetch if > 250 to save CPU/trips
+                            if (specialMineral && container.store[specialMineral] > 250) {
+                                target = container;
+                                resourceToFetch = specialMineral;
+                            }
+                        }
+                    }
+                }
+
+                // Priority 4: Tower Energy Hauling
+                if (!target && storage) {
+                    const towers = creep.room.find(FIND_MY_STRUCTURES, {
+                        filter: s => s.structureType === STRUCTURE_TOWER && s.store.getFreeCapacity(RESOURCE_ENERGY) > 200
+                    }) as StructureTower[];
+
+                    if (towers.length > 0 && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
+                        const targetTower = towers.reduce((lowest, t) => t.store[RESOURCE_ENERGY] < lowest.store[RESOURCE_ENERGY] ? t : lowest, towers[0]);
+                        target = storage;
+                        resourceToFetch = RESOURCE_ENERGY;
+                        creep.memory.deliveryTargetId = targetTower.id;
                     }
                 }
             }
 
-            // Priority 3: Extractor Minerals
-            const extractor = creep.room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTRACTOR } })[0];
-            const mineral = creep.room.find(FIND_MINERALS)[0];
-            const quota = COLONY_SETTINGS.mineralQuotas[creep.room.name];
-            let needsMinerals = false;
-            if (extractor && mineral && quota !== undefined && creep.room.storage) {
-                const currentStock = creep.room.storage.store.getUsedCapacity(mineral.mineralType);
-                if (currentStock < quota) needsMinerals = true;
-            }
-
-            if (!target && needsMinerals && extractor) {
-                // Check ground drops near extractor (minerals)
-                const drops = creep.room.find(FIND_DROPPED_RESOURCES, {
-                    filter: r => r.resourceType !== RESOURCE_ENERGY && r.pos.inRangeTo(extractor, 1)
-                });
-
-                if (drops.length > 0) {
-                    target = drops[0];
+            // RECYCLE CHECK: If no target found AND no work left to do (and emptyTerminal is not set)
+            if (!target && !creep.memory.emptyTerminal) {
+                const extractor = creep.room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTRACTOR } })[0];
+                const mineral = creep.room.find(FIND_MINERALS)[0];
+                const quota = COLONY_SETTINGS.mineralQuotas[creep.room.name];
+                let needsMinerals = false;
+                if (extractor && mineral && quota !== undefined && creep.room.storage) {
+                    const currentStock = creep.room.storage.store.getUsedCapacity(mineral.mineralType);
+                    if (currentStock < quota) needsMinerals = true;
                 }
 
-                // Check container near extractor
-                if (!target) {
-                    const container = extractor.pos.findInRange(FIND_STRUCTURES, 1, {
-                        filter: s => s.structureType === STRUCTURE_CONTAINER
-                    })[0] as StructureContainer;
+                if (!needsMinerals) {
+                    // Double check if any transfers are still possible
+                    const hasPendingTransfers = terminal && storage && transfers.some(t => (terminal.store[t.resource] || 0) < t.amount && (storage.store[t.resource] || 0) > 0);
 
-                    if (container) {
-                        const specialMineral = Object.keys(container.store).find(res => res !== RESOURCE_ENERGY) as ResourceConstant;
-                        // Only fetch if > 250 to save CPU/trips
-                        if (specialMineral && container.store[specialMineral] > 250) {
-                            target = container;
-                            resourceToFetch = specialMineral;
-                        }
+                    if (!hasPendingTransfers) {
+                        creep.say('✅ All Done');
+                        creep.memory.recycle = true;
+                        return;
                     }
-                }
-            }
-
-            // Priority 4: Tower Energy Hauling
-            if (!target && storage) {
-                const towers = creep.room.find(FIND_MY_STRUCTURES, {
-                    filter: s => s.structureType === STRUCTURE_TOWER && s.store.getFreeCapacity(RESOURCE_ENERGY) > 200
-                }) as StructureTower[];
-
-                if (towers.length > 0 && storage.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
-                    const targetTower = towers.reduce((lowest, t) => t.store[RESOURCE_ENERGY] < lowest.store[RESOURCE_ENERGY] ? t : lowest, towers[0]);
-                    target = storage;
-                    resourceToFetch = RESOURCE_ENERGY;
-                    creep.memory.deliveryTargetId = targetTower.id;
-                }
-            }
-
-            // RECYCLE CHECK: If no target found AND no work left to do
-            if (!target && !needsMinerals) {
-                // Double check if any transfers are still possible
-                const hasPendingTransfers = terminal && storage && transfers.some(t => (terminal.store[t.resource] || 0) < t.amount && (storage.store[t.resource] || 0) > 0);
-
-                if (!hasPendingTransfers) {
-                    creep.say('✅ All Done');
-                    creep.memory.recycle = true;
-                    return;
                 }
             }
 

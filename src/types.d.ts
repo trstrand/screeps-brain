@@ -88,6 +88,7 @@ declare global {
         dismantleExtensions?: boolean;
         lastPos?: { x: number, y: number, roomName: string };
         stuckCount?: number;
+        emptyTerminal?: boolean;
     }
 
     interface RoomMemory {
