@@ -207,4 +207,55 @@ describe('Role: Hauler', () => {
 
         expect(mockCreep.memory.deliveryTargetId).toBe('tower_2');
     });
+
+    it('should withdraw from terminal if storage has no energy but terminal does', () => {
+        mockCreep.memory.working = false;
+        mockCreep.store.getUsedCapacity.mockReturnValue(0);
+        mockCreep.store.getFreeCapacity.mockReturnValue(50);
+        mockCreep.pos.getRangeTo.mockReturnValue(2);
+        mockCreep.pos.inRangeTo = vi.fn().mockReturnValue(true);
+
+        mockCreep.room.energyAvailable = 300;
+        mockCreep.room.energyCapacityAvailable = 300;
+        mockCreep.room.storage = {
+            id: 'storage_id',
+            structureType: (globalThis as any).STRUCTURE_STORAGE,
+            store: {
+                [(globalThis as any).RESOURCE_ENERGY]: 0
+            }
+        };
+        mockCreep.room.terminal = {
+            id: 'terminal_id',
+            structureType: 'terminal',
+            store: {
+                [(globalThis as any).RESOURCE_ENERGY]: 1000
+            }
+        };
+
+        const mockTower = {
+            id: 'tower_id',
+            structureType: (globalThis as any).STRUCTURE_TOWER,
+            store: {
+                getUsedCapacity: () => 700,
+                getCapacity: () => 1000,
+                getFreeCapacity: () => 300,
+            }
+        };
+
+        mockCreep.room.find = vi.fn().mockImplementation((type, options) => {
+            if (type === (globalThis as any).FIND_MY_STRUCTURES) {
+                const structures = [mockTower];
+                if (options && options.filter) {
+                    return structures.filter(options.filter);
+                }
+                return structures;
+            }
+            return [];
+        });
+
+        roleHauler.run(mockCreep);
+
+        expect(mockCreep.memory.targetId).toBe('terminal_id');
+        expect(mockCreep.moveTo).toHaveBeenCalledWith(mockCreep.room.terminal, expect.any(Object));
+    });
 });

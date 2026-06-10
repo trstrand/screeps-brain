@@ -184,6 +184,13 @@ export const roleHauler: RoleHandler = {
         else {
             let target: any = null;
 
+            let energySource: StructureStorage | StructureTerminal | null = null;
+            if (creep.room.storage && creep.room.storage.store[RESOURCE_ENERGY] > 0) {
+                energySource = creep.room.storage;
+            } else if (creep.room.terminal && creep.room.terminal.store[RESOURCE_ENERGY] > 0) {
+                energySource = creep.room.terminal;
+            }
+
             const sourceIds = creep.room.memory.sourceIds || [];
             let activeSources = sourceIds.map(id => Game.getObjectById(id as Id<Source>)).filter(s => s !== null) as Source[];
             if (activeSources.length === 0) activeSources = creep.room.find(FIND_SOURCES);
@@ -211,7 +218,7 @@ export const roleHauler: RoleHandler = {
                 ];
 
                 const currentTargetIsP1 = target && mySpawns.some(s => target.pos.inRangeTo(s, 3));
-                const targetIsHub = target && (target.structureType === STRUCTURE_STORAGE || target.structureType === STRUCTURE_LINK);
+                const targetIsHub = target && (target.structureType === STRUCTURE_STORAGE || target.structureType === STRUCTURE_LINK || target.structureType === STRUCTURE_TERMINAL);
                 const shouldPreempt = p1Targets.length > 0 && !currentTargetIsP1 && !targetIsHub;
 
                 if (!hasEnergy || shouldPreempt) {
@@ -260,7 +267,8 @@ export const roleHauler: RoleHandler = {
             if (!target) {
                 // Priority 0.5: Proactive Base Hub Check (Links)
                 // If in the base area, handle Link siphoning/feeding before walking away
-                if (creep.room.storage && creep.pos.inRangeTo(creep.room.storage, 5)) {
+                const hubStructure = creep.room.storage || creep.room.terminal;
+                if (hubStructure && creep.pos.inRangeTo(hubStructure, 5)) {
                     if (creep.room.memory.storageLink) {
                         const storageLink = Game.getObjectById(creep.room.memory.storageLink as Id<StructureLink>);
                         const hasSourceLink = !!creep.room.memory.sourceLink1 || !!creep.room.memory.sourceLink2;
@@ -270,10 +278,10 @@ export const roleHauler: RoleHandler = {
                             if (hasSourceLink && storageLink.store.getUsedCapacity(RESOURCE_ENERGY) > 0) {
                                 target = storageLink;
                             }
-                            // B: Feed (Storage -> Link)
+                            // B: Feed (Storage/Terminal -> Link)
                             else if (!hasSourceLink && creep.room.memory.controllerLink && storageLink.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                                if (this.shuttleCheck(creep.room) && creep.room.storage.store[RESOURCE_ENERGY] > 0) {
-                                    target = creep.room.storage;
+                                if (this.shuttleCheck(creep.room) && energySource) {
+                                    target = energySource;
                                 }
                             }
                         }
@@ -290,11 +298,11 @@ export const roleHauler: RoleHandler = {
                     target = creep.pos.findClosestByRange(nearbyDrops);
                 }
 
-                // Priority 1.5: Hub Refill (Storage -> Spawns/Extensions)
-                // If near storage and base needs energy, pull from storage now
-                if (!target && creep.room.storage && creep.pos.inRangeTo(creep.room.storage, 5)) {
-                    if (creep.room.storage.store[RESOURCE_ENERGY] > 0 && (!this.shuttleCheck(creep.room) || towersNeedEnergy)) {
-                        target = creep.room.storage;
+                // Priority 1.5: Hub Refill (Storage/Terminal -> Spawns/Extensions)
+                // If near storage/terminal and base needs energy, pull from energy source now
+                if (!target && energySource && creep.pos.inRangeTo(energySource, 5)) {
+                    if (!this.shuttleCheck(creep.room) || towersNeedEnergy) {
+                        target = energySource;
                     }
                 }
 
@@ -335,22 +343,22 @@ export const roleHauler: RoleHandler = {
                     }
                 }
 
-                // Priority 5: General room.storage fallback
-                // ONLY pull from storage if we actually have a destination that needs it (Spawns/Extensions/Towers)
-                if (!target && creep.room.storage && creep.room.storage.store[RESOURCE_ENERGY] > 0) {
+                // Priority 5: General room.storage / room.terminal fallback
+                // ONLY pull if we actually have a destination that needs it (Spawns/Extensions/Towers)
+                if (!target && energySource) {
                     if (!this.shuttleCheck(creep.room) || towersNeedEnergy) {
-                        target = creep.room.storage;
+                        target = energySource;
                     }
                 }
 
-                // Priority 5.5: Feed Link Network from Storage (Storage -> Link -> Controller)
-                if (!target && creep.room.storage && creep.room.storage.store[RESOURCE_ENERGY] > 0 && creep.room.memory.storageLink) {
+                // Priority 5.5: Feed Link Network from Storage/Terminal (Storage/Terminal -> Link -> Controller)
+                if (!target && energySource && creep.room.memory.storageLink) {
                     const storageLink = Game.getObjectById(creep.room.memory.storageLink as Id<StructureLink>);
                     const hasSourceLink = !!creep.room.memory.sourceLink1 || !!creep.room.memory.sourceLink2;
                     const linkNeedsEnergy = !hasSourceLink && creep.room.memory.controllerLink && storageLink && storageLink.store.getFreeCapacity(RESOURCE_ENERGY) > 0;
 
                     if (linkNeedsEnergy) {
-                        target = creep.room.storage;
+                        target = energySource;
                     }
                 }
 
@@ -423,7 +431,7 @@ export const roleHauler: RoleHandler = {
                         const targetResource = target as Resource;
                         const isMostlyFull = creep.store.getUsedCapacity(RESOURCE_ENERGY) >= creep.store.getCapacity() * 0.8;
                         const isSourceContainer = targetStructure.structureType === STRUCTURE_CONTAINER && isNearSource(targetStructure.pos);
-                        const isStorage = targetStructure.structureType === STRUCTURE_STORAGE;
+                        const isStorage = targetStructure.structureType === STRUCTURE_STORAGE || targetStructure.structureType === STRUCTURE_TERMINAL;
                         const isStorageLink = targetStructure.structureType === STRUCTURE_LINK && targetStructure.id === creep.room.memory.storageLink;
                         const isSourceDrop = targetResource.resourceType === RESOURCE_ENERGY && isNearSource(targetResource.pos);
 

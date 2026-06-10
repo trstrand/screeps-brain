@@ -285,4 +285,26 @@ describe('Role: Builder', () => {
         expect(mockCreep.memory.targetId).toBeNull();
         expect(mockCreep.harvest).not.toHaveBeenCalled();
     });
+
+    it('should fallback to terminal if storage has no energy but terminal has energy', () => {
+        mockCreep.memory.working = false;
+        mockCreep.store.getFreeCapacity.mockReturnValue(50);
+        mockCreep.store.getUsedCapacity.mockReturnValue(0);
+        mockCreep.store[RESOURCE_ENERGY] = 0;
+
+        const mockStorage = { id: 'storage_1', structureType: 'storage', store: { getUsedCapacity: () => 0 }, pos: { x: 20, y: 20 } };
+        const mockTerminal = { id: 'terminal_1', structureType: 'terminal', store: { getUsedCapacity: () => 500 }, pos: { x: 25, y: 25 } };
+
+        mockCreep.room.find = vi.fn().mockReturnValue([]);
+        mockCreep.room.storage = mockStorage;
+        mockCreep.room.terminal = mockTerminal;
+
+        mockCreep.room.findPath = vi.fn().mockReturnValue([{ x: 25, y: 25 }]);
+        mockCreep.pos.isNearTo = vi.fn().mockReturnValue(false);
+
+        roleBuilder.run(mockCreep);
+
+        expect(mockCreep.memory.targetId).toBe('terminal_1');
+        expect(mockCreep.withdraw).toHaveBeenCalledWith(mockTerminal, 'energy');
+    });
 });
