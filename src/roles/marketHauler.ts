@@ -98,6 +98,30 @@ export const roleMarketHauler: RoleHandler = {
                     }
                 }
 
+                // Priority 0.6: Power Spawn Delivery
+                if (!delivered && (carrying === RESOURCE_ENERGY || carrying === RESOURCE_POWER)) {
+                    let targetPS: StructurePowerSpawn | null = null;
+                    if (creep.memory.deliveryTargetId) {
+                        const ps = Game.getObjectById(creep.memory.deliveryTargetId) as Structure | null;
+                        if (ps && ps.structureType === STRUCTURE_POWER_SPAWN) {
+                            targetPS = ps as StructurePowerSpawn;
+                        }
+                    } else if (carrying === RESOURCE_POWER) {
+                        targetPS = creep.room.find(FIND_MY_STRUCTURES, {
+                            filter: s => s.structureType === STRUCTURE_POWER_SPAWN
+                        })[0] as StructurePowerSpawn | undefined || null;
+                    }
+
+                    if (targetPS && targetPS.store.getFreeCapacity(carrying) > 0) {
+                        if (creep.transfer(targetPS, carrying) === ERR_NOT_IN_RANGE) {
+                            moveWithSweeper(creep, targetPS, { visualizePathStyle: { stroke: '#ff00ff' } });
+                        }
+                        delivered = true;
+                    } else if (creep.memory.deliveryTargetId === (targetPS ? targetPS.id : '')) {
+                        delete creep.memory.deliveryTargetId;
+                    }
+                }
+
                 // Priority 1: Terminal (If it's on the transfer list and terminal isn't full of it)
                 if (!delivered && terminal) {
                     const transferConfig = transfers.find(t => t.resource === carrying);
@@ -228,6 +252,44 @@ export const roleMarketHauler: RoleHandler = {
                         creep.memory.deliveryTargetId = targetTower.id;
                     }
                 }
+
+                // Priority 4.5: Power Spawn Filling
+                if (!target) {
+                    const powerSpawn = creep.room.find(FIND_MY_STRUCTURES, {
+                        filter: s => s.structureType === STRUCTURE_POWER_SPAWN
+                    })[0] as StructurePowerSpawn | undefined;
+
+                    if (powerSpawn) {
+                        // Check Power first
+                        if (powerSpawn.store.getFreeCapacity(RESOURCE_POWER) > 0) {
+                            let source: StructureStorage | StructureTerminal | null = null;
+                            if (storage && storage.store[RESOURCE_POWER] > 0) {
+                                source = storage;
+                            } else if (terminal && terminal.store[RESOURCE_POWER] > 0) {
+                                source = terminal;
+                            }
+                            if (source) {
+                                target = source;
+                                resourceToFetch = RESOURCE_POWER;
+                                creep.memory.deliveryTargetId = powerSpawn.id;
+                            }
+                        }
+                        // Check Energy second
+                        if (!target && powerSpawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                            let source: StructureStorage | StructureTerminal | null = null;
+                            if (storage && storage.store[RESOURCE_ENERGY] > 0) {
+                                source = storage;
+                            } else if (terminal && terminal.store[RESOURCE_ENERGY] > 0) {
+                                source = terminal;
+                            }
+                            if (source) {
+                                target = source;
+                                resourceToFetch = RESOURCE_ENERGY;
+                                creep.memory.deliveryTargetId = powerSpawn.id;
+                            }
+                        }
+                    }
+                }
             }
 
             // RECYCLE CHECK: If no target found AND no work left to do (and emptyTerminal is not set)
@@ -241,7 +303,23 @@ export const roleMarketHauler: RoleHandler = {
                     if (currentStock < quota) needsMinerals = true;
                 }
 
-                if (!needsMinerals) {
+                // Check if Power Spawn needs filling
+                let psNeedsFilling = false;
+                const powerSpawn = creep.room.find(FIND_MY_STRUCTURES, {
+                    filter: s => s.structureType === STRUCTURE_POWER_SPAWN
+                })[0] as StructurePowerSpawn | undefined;
+                if (powerSpawn) {
+                    const hasPowerAvailable = (storage && storage.store[RESOURCE_POWER] > 0) || (terminal && terminal.store[RESOURCE_POWER] > 0);
+                    const hasEnergyAvailable = (storage && storage.store[RESOURCE_ENERGY] > 0) || (terminal && terminal.store[RESOURCE_ENERGY] > 0);
+                    if (
+                        (powerSpawn.store.getFreeCapacity(RESOURCE_POWER) > 0 && hasPowerAvailable) ||
+                        (powerSpawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0 && hasEnergyAvailable)
+                    ) {
+                        psNeedsFilling = true;
+                    }
+                }
+
+                if (!needsMinerals && !psNeedsFilling) {
                     // Double check if any transfers are still possible
                     const hasPendingTransfers = terminal && storage && transfers.some(t => (terminal.store[t.resource] || 0) < t.amount && (storage.store[t.resource] || 0) > 0);
 

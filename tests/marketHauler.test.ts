@@ -290,4 +290,119 @@ describe('Role: MarketHauler', () => {
             expect(mockCreep.moveTo).toHaveBeenCalledWith(mockStorage, expect.any(Object));
         });
     });
+
+    describe('Power Spawn Handling', () => {
+        let mockPowerSpawn: any;
+        let mockStorage: any;
+
+        beforeEach(() => {
+            mockPowerSpawn = {
+                id: 'power_spawn1' as Id<any>,
+                structureType: 'powerSpawn',
+                store: {
+                    getFreeCapacity: vi.fn().mockImplementation((res) => {
+                        if (res === 'power') return 100;
+                        if (res === 'energy') return 5000;
+                        return 0;
+                    })
+                }
+            };
+
+            mockStorage = {
+                id: 'storage1' as Id<any>,
+                structureType: 'storage',
+                store: {
+                    energy: 10000,
+                    power: 50,
+                    getUsedCapacity: vi.fn().mockReturnValue(10050)
+                }
+            };
+
+            mockCreep.room.storage = mockStorage as any;
+            mockCreep.room.find = vi.fn().mockImplementation((type) => {
+                if (type === 102 /* FIND_MY_STRUCTURES */) return [mockPowerSpawn];
+                return [];
+            });
+        });
+
+        it('should fetch power from storage if power spawn needs power', () => {
+            mockCreep.memory.working = false;
+            mockCreep.store.getUsedCapacity.mockReturnValue(0);
+
+            roleMarketHauler.run(mockCreep);
+
+            expect(mockCreep.memory.deliveryTargetId).toBe('power_spawn1');
+            expect(mockCreep.memory.targetId).toBe('storage1');
+            expect(mockCreep.moveTo).toHaveBeenCalledWith(mockStorage, expect.any(Object));
+        });
+
+        it('should fetch energy from storage if power spawn needs energy (but has power)', () => {
+            mockCreep.memory.working = false;
+            mockCreep.store.getUsedCapacity.mockReturnValue(0);
+            mockPowerSpawn.store.getFreeCapacity = vi.fn().mockImplementation((res) => {
+                if (res === 'power') return 0;
+                if (res === 'energy') return 1000;
+                return 0;
+            });
+
+            roleMarketHauler.run(mockCreep);
+
+            expect(mockCreep.memory.deliveryTargetId).toBe('power_spawn1');
+            expect(mockCreep.memory.targetId).toBe('storage1');
+            expect(mockCreep.moveTo).toHaveBeenCalledWith(mockStorage, expect.any(Object));
+        });
+
+        it('should deliver power to power spawn if carrying power', () => {
+            mockCreep.memory.working = true;
+            mockCreep.store.getUsedCapacity.mockReturnValue(10);
+            mockCreep.store.power = 10;
+            mockCreep.transfer = vi.fn().mockReturnValue(OK);
+
+            (globalThis as any).Game.getObjectById = vi.fn().mockReturnValue(mockPowerSpawn);
+
+            roleMarketHauler.run(mockCreep);
+
+            expect(mockCreep.transfer).toHaveBeenCalledWith(mockPowerSpawn, 'power');
+        });
+
+        it('should deliver energy to power spawn if carrying energy and deliveryTargetId is set', () => {
+            mockCreep.memory.working = true;
+            mockCreep.memory.deliveryTargetId = 'power_spawn1';
+            mockCreep.store.getUsedCapacity.mockReturnValue(100);
+            mockCreep.store.energy = 100;
+            mockCreep.transfer = vi.fn().mockReturnValue(OK);
+
+            (globalThis as any).Game.getObjectById = vi.fn().mockReturnValue(mockPowerSpawn);
+
+            roleMarketHauler.run(mockCreep);
+
+            expect(mockCreep.transfer).toHaveBeenCalledWith(mockPowerSpawn, 'energy');
+        });
+
+        it('should not recycle if power spawn needs filling', () => {
+            mockCreep.memory.working = false;
+            mockCreep.store.getUsedCapacity.mockReturnValue(0);
+            
+            // Storage doesn't have power or energy (so target is null), but wait, if storage has them, we would target it.
+            // Let's mock a case where target is null because of range or other logic, but psNeedsFilling is true:
+            // Actually, if we just check that recycle is not set to true:
+            mockStorage.store.energy = 0;
+            mockStorage.store.power = 0;
+            mockStorage.store.getUsedCapacity = vi.fn().mockReturnValue(0);
+            
+            // Let's make power available in terminal instead:
+            mockCreep.room.terminal = {
+                id: 'terminal1',
+                structureType: 'terminal',
+                store: { power: 10, energy: 0 }
+            } as any;
+            
+            // To make target null, we can mock findClosestByRange or something to return null, or just make drops/terminal unreachable, or mock findPath:
+            mockCreep.room.findPath = vi.fn().mockReturnValue([]); // Makes it unreachable
+
+            roleMarketHauler.run(mockCreep);
+
+            expect(mockCreep.memory.recycle).toBeUndefined();
+        });
+    });
 });

@@ -23,6 +23,14 @@ export class RoomManager {
             SpawnManager.run(room);
             TowerManager.run(room);
             LinkManager.run(room);
+
+            // 3. POWER SPAWN: Process power if resource requirements are met
+            const powerSpawn = room.find(FIND_MY_STRUCTURES, {
+                filter: s => s.structureType === STRUCTURE_POWER_SPAWN
+            })[0] as StructurePowerSpawn | undefined;
+            if (powerSpawn && powerSpawn.store[RESOURCE_POWER] > 0 && powerSpawn.store[RESOURCE_ENERGY] >= 50) {
+                powerSpawn.processPower();
+            }
         }
     }
 }

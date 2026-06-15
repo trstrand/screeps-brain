@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.hoisted(() => {
     (globalThis as any).FIND_SOURCES = 112;
+    (globalThis as any).FIND_MY_STRUCTURES = 102;
+    (globalThis as any).STRUCTURE_POWER_SPAWN = 'powerSpawn';
+    (globalThis as any).RESOURCE_POWER = 'power';
+    (globalThis as any).RESOURCE_ENERGY = 'energy';
 });
 
 import { RoomManager } from '../src/managers/RoomManager';
@@ -68,5 +72,47 @@ describe('RoomManager', () => {
         expect(SpawnManager.run).toHaveBeenCalledWith(mockRoom);
         expect(TowerManager.run).toHaveBeenCalledWith(mockRoom);
         expect(LinkManager.run).toHaveBeenCalledWith(mockRoom);
+    });
+
+    it('should processPower if power spawn has enough energy and power', () => {
+        const mockPowerSpawn = {
+            structureType: 'powerSpawn',
+            store: {
+                power: 10,
+                energy: 1000
+            },
+            processPower: vi.fn()
+        };
+
+        mockRoom.find = vi.fn().mockImplementation((type) => {
+            if (type === FIND_SOURCES) return [];
+            if (type === FIND_MY_STRUCTURES) return [mockPowerSpawn];
+            return [];
+        });
+
+        RoomManager.run();
+
+        expect(mockPowerSpawn.processPower).toHaveBeenCalled();
+    });
+
+    it('should not processPower if power spawn does not have enough energy', () => {
+        const mockPowerSpawn = {
+            structureType: 'powerSpawn',
+            store: {
+                power: 10,
+                energy: 40
+            },
+            processPower: vi.fn()
+        };
+
+        mockRoom.find = vi.fn().mockImplementation((type) => {
+            if (type === FIND_SOURCES) return [];
+            if (type === FIND_MY_STRUCTURES) return [mockPowerSpawn];
+            return [];
+        });
+
+        RoomManager.run();
+
+        expect(mockPowerSpawn.processPower).not.toHaveBeenCalled();
     });
 });
