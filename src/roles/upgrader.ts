@@ -6,6 +6,12 @@ export const roleUpgrader: RoleHandler = {
         const controller = creep.room.controller;
         if (!controller) return;
 
+        // Level 8 room logic: only upgrade when ticksToDowngrade is low, otherwise recycle
+        if (controller.my && controller.level === 8 && controller.ticksToDowngrade >= 75000) {
+            creep.memory.recycle = true;
+            return;
+        }
+
         // 1. Identify Infrastructure
         const container = controller.pos.findInRange(FIND_STRUCTURES, 1, {
             filter: s => s.structureType === STRUCTURE_CONTAINER

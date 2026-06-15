@@ -321,4 +321,41 @@ describe('SpawnManager', () => {
             emptyTerminal: false
         });
     });
+
+    it('should skip upgrader if room is lvl 8 and ticksToDowngrade is >= 75000', () => {
+        // Satisfy all other quotas so it tries to check upgrader
+        (Game as any).creeps = {
+            'miner1': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 0 } },
+            'miner2': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 1 } },
+            'hauler1': { memory: { role: 'hauler', homeRoom: 'E1N1' } },
+            'hauler2': { memory: { role: 'hauler', homeRoom: 'E1N1' } }
+        } as any;
+
+        COLONY_SETTINGS.roomQuotas['E1N1'].upgrader = 1;
+        mockRoom.controller = { my: true, level: 8, ticksToDowngrade: 75000 } as any;
+
+        SpawnManager.run(mockRoom as any);
+
+        const upgraderCall = mockSpawn.spawnCreep.mock.calls.find(call => call[1].startsWith('upgrader'));
+        expect(upgraderCall).toBeUndefined();
+    });
+
+    it('should spawn upgrader if room is lvl 8 and ticksToDowngrade is < 75000', () => {
+        // Satisfy all other quotas so it tries to check upgrader
+        (Game as any).creeps = {
+            'miner1': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 0 } },
+            'miner2': { memory: { role: 'miner', homeRoom: 'E1N1', sourceIndex: 1 } },
+            'hauler1': { memory: { role: 'hauler', homeRoom: 'E1N1' } },
+            'hauler2': { memory: { role: 'hauler', homeRoom: 'E1N1' } }
+        } as any;
+
+        COLONY_SETTINGS.roomQuotas['E1N1'].upgrader = 1;
+        mockRoom.controller = { my: true, level: 8, ticksToDowngrade: 74999 } as any;
+
+        SpawnManager.run(mockRoom as any);
+
+        const upgraderCall = mockSpawn.spawnCreep.mock.calls.find(call => call[1].startsWith('upgrader'));
+        expect(upgraderCall).toBeDefined();
+        expect(upgraderCall![0]).toEqual(['work', 'move']);
+    });
 });

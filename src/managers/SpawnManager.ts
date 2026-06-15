@@ -78,7 +78,14 @@ export class SpawnManager {
         const criticalRoles = ['miner', 'hauler', 'upgrader'];
         for (const role of criticalRoles) {
             const count = localRoleCounts[role] || 0;
-            const quota = (quotas as any)[role] || 0;
+            let quota = (quotas as any)[role] || 0;
+
+            if (role === 'upgrader' && quota > 0) {
+                const controller = room.controller;
+                if (controller && controller.my && controller.level === 8 && controller.ticksToDowngrade >= 75000) {
+                    quota = 0;
+                }
+            }
 
             if (count === 0 && quota > 0) {
                 let memory: any = { ...baseMem, role };
@@ -86,7 +93,9 @@ export class SpawnManager {
                     memory.working = true;
                     memory.sourceIndex = 0; // First one always takes index 0
                 }
-                const body = this.getBody(role, bodyEnergy);
+                const body = (role === 'upgrader' && room.controller && room.controller.level === 8)
+                    ? [WORK, MOVE]
+                    : this.getBody(role, bodyEnergy);
                 if (spawn.spawnCreep(body, `${role}_${Game.time}`, { memory }) === OK) return;
             }
         }
@@ -188,6 +197,12 @@ export class SpawnManager {
 
             // Skip if special conditions aren't met
             if (role === 'builder' && targetCount > 0 && room.find(FIND_CONSTRUCTION_SITES).length === 0) targetCount = 0;
+            if (role === 'upgrader' && targetCount > 0) {
+                const controller = room.controller;
+                if (controller && controller.my && controller.level === 8 && controller.ticksToDowngrade >= 75000) {
+                    targetCount = 0;
+                }
+            }
             if (role === 'upgradeHauler' && targetCount > 0) {
                 const controller = room.controller;
                 const containerNearController = controller ? controller.pos.findInRange(FIND_STRUCTURES, 1, {
@@ -269,7 +284,9 @@ export class SpawnManager {
                 if (role === 'remoteBuilder' && COLONY_SETTINGS.remoteBuild) memory.targetRoom = COLONY_SETTINGS.remoteBuild;
                 if (role === 'claimer' && COLONY_SETTINGS.claimRoom) memory.targetRoom = COLONY_SETTINGS.claimRoom;
 
-                const body = this.getBody(role, bodyEnergy);
+                const body = (role === 'upgrader' && room.controller && room.controller.level === 8)
+                    ? [WORK, MOVE]
+                    : this.getBody(role, bodyEnergy);
                 const result = spawn.spawnCreep(body, `${role}_${Game.time}`, { memory });
                 if (result === OK) return;
                 if (result === ERR_NOT_ENOUGH_ENERGY) return; // Wait for energy

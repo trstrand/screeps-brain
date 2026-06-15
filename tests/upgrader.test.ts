@@ -112,4 +112,26 @@ describe('Role: Upgrader', () => {
         expect(mockCreep.memory.working).toBe(false);
         expect(mockCreep.say).toHaveBeenCalledWith('🔍 Fetch');
     });
+
+    it('should set recycle to true if room is lvl 8 and ticksToDowngrade is >= 75000', () => {
+        mockController.my = true;
+        mockController.level = 8;
+        mockController.ticksToDowngrade = 75000;
+
+        roleUpgrader.run(mockCreep);
+
+        expect(mockCreep.memory.recycle).toBe(true);
+        expect(mockCreep.upgradeController).not.toHaveBeenCalled();
+    });
+
+    it('should not recycle if room is lvl 8 but ticksToDowngrade is < 75000', () => {
+        mockController.my = true;
+        mockController.level = 8;
+        mockController.ticksToDowngrade = 74999;
+
+        roleUpgrader.run(mockCreep);
+
+        expect(mockCreep.memory.recycle).toBeUndefined();
+        expect(mockCreep.upgradeController).toHaveBeenCalled();
+    });
 });
