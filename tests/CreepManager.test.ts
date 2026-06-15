@@ -62,6 +62,28 @@ describe('CreepManager', () => {
         expect(RoleRegistry.miner.run).not.toHaveBeenCalled();
     });
 
+    it('should unload marketHauler into room.storage before recycling if carrying items', () => {
+        mockCreep.memory.role = 'marketHauler';
+        mockCreep.memory.recycle = true;
+        mockCreep.store = {
+            energy: 100,
+            getUsedCapacity: vi.fn().mockReturnValue(100)
+        };
+        const mockStorage = {
+            structureType: 'storage'
+        };
+        mockCreep.room = {
+            storage: mockStorage
+        };
+        mockCreep.transfer = vi.fn().mockReturnValue(0); // OK
+
+        CreepManager.run();
+
+        expect(mockCreep.say).toHaveBeenCalledWith('📦 Empty');
+        expect(mockCreep.transfer).toHaveBeenCalledWith(mockStorage, 'energy');
+        expect(mockSpawn.recycleCreep).not.toHaveBeenCalled();
+    });
+
     it('should run the correct role handler for the creep', () => {
         CreepManager.run();
         expect(RoleRegistry.miner.run).toHaveBeenCalledWith(mockCreep);

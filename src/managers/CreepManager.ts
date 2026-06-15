@@ -7,6 +7,17 @@ export class CreepManager {
             if (creep.spawning) continue;
 
             if (creep.memory.recycle) {
+                if (creep.memory.role === 'marketHauler' && creep.store.getUsedCapacity() > 0 && creep.room.storage) {
+                    const carrying = Object.keys(creep.store).find(res => creep.store[res as ResourceConstant] > 0) as ResourceConstant | undefined;
+                    if (carrying) {
+                        creep.say('📦 Empty');
+                        if (creep.transfer(creep.room.storage, carrying) === ERR_NOT_IN_RANGE) {
+                            creep.moveTo(creep.room.storage, { visualizePathStyle: { stroke: '#ffffff' } });
+                        }
+                        continue;
+                    }
+                }
+
                 creep.say('♻️ recycle');
                 const spawn = creep.pos.findClosestByRange(FIND_MY_SPAWNS);
                 if (spawn) {
