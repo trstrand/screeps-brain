@@ -98,7 +98,7 @@ export const roleMarketHauler: RoleHandler = {
                     }
                 }
 
-                // Priority 0.6: Power Spawn Delivery
+                // Priority 0.6: Power Spawn Delivery (always check proactively for energy/power)
                 if (!delivered && (carrying === RESOURCE_ENERGY || carrying === RESOURCE_POWER)) {
                     let targetPS: StructurePowerSpawn | null = null;
                     if (creep.memory.deliveryTargetId) {
@@ -106,7 +106,9 @@ export const roleMarketHauler: RoleHandler = {
                         if (ps && ps.structureType === STRUCTURE_POWER_SPAWN) {
                             targetPS = ps as StructurePowerSpawn;
                         }
-                    } else if (carrying === RESOURCE_POWER) {
+                    }
+                    // Always proactively find the power spawn — fill it before terminal transfers
+                    if (!targetPS) {
                         targetPS = creep.room.find(FIND_MY_STRUCTURES, {
                             filter: s => s.structureType === STRUCTURE_POWER_SPAWN
                         })[0] as StructurePowerSpawn | undefined || null;
@@ -192,7 +194,45 @@ export const roleMarketHauler: RoleHandler = {
                     }
                 }
 
-                // Priority 2: Terminal Transfers (Storage -> Terminal)
+                // Priority 2: Power Spawn Filling (raised above terminal transfers — fill PS before anything else)
+                if (!target) {
+                    const powerSpawn = creep.room.find(FIND_MY_STRUCTURES, {
+                        filter: s => s.structureType === STRUCTURE_POWER_SPAWN
+                    })[0] as StructurePowerSpawn | undefined;
+
+                    if (powerSpawn) {
+                        // Check Power first
+                        if (powerSpawn.store.getFreeCapacity(RESOURCE_POWER) > 0) {
+                            let source: StructureStorage | StructureTerminal | null = null;
+                            if (storage && storage.store[RESOURCE_POWER] > 0) {
+                                source = storage;
+                            } else if (terminal && terminal.store[RESOURCE_POWER] > 0) {
+                                source = terminal;
+                            }
+                            if (source) {
+                                target = source;
+                                resourceToFetch = RESOURCE_POWER;
+                                creep.memory.deliveryTargetId = powerSpawn.id;
+                            }
+                        }
+                        // Check Energy second
+                        if (!target && powerSpawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
+                            let source: StructureStorage | StructureTerminal | null = null;
+                            if (storage && storage.store[RESOURCE_ENERGY] > 0) {
+                                source = storage;
+                            } else if (terminal && terminal.store[RESOURCE_ENERGY] > 0) {
+                                source = terminal;
+                            }
+                            if (source) {
+                                target = source;
+                                resourceToFetch = RESOURCE_ENERGY;
+                                creep.memory.deliveryTargetId = powerSpawn.id;
+                            }
+                        }
+                    }
+                }
+
+                // Priority 3: Terminal Transfers (Storage -> Terminal)
                 if (!target && terminal && storage) {
                     for (const transfer of transfers) {
                         const currentInTerminal = terminal.store[transfer.resource] || 0;
@@ -207,7 +247,7 @@ export const roleMarketHauler: RoleHandler = {
                     }
                 }
 
-                // Priority 3: Extractor Minerals
+                // Priority 4: Extractor Minerals
                 const extractor = creep.room.find(FIND_MY_STRUCTURES, { filter: { structureType: STRUCTURE_EXTRACTOR } })[0];
                 const mineral = creep.room.find(FIND_MINERALS)[0];
                 const quota = COLONY_SETTINGS.mineralQuotas[creep.room.name];
@@ -244,7 +284,7 @@ export const roleMarketHauler: RoleHandler = {
                     }
                 }
 
-                // Priority 4: Tower Energy Hauling
+                // Priority 5: Tower Energy Hauling
                 if (!target && storage) {
                     const towers = creep.room.find(FIND_MY_STRUCTURES, {
                         filter: s => s.structureType === STRUCTURE_TOWER && s.store.getFreeCapacity(RESOURCE_ENERGY) > 200
@@ -255,44 +295,6 @@ export const roleMarketHauler: RoleHandler = {
                         target = storage;
                         resourceToFetch = RESOURCE_ENERGY;
                         creep.memory.deliveryTargetId = targetTower.id;
-                    }
-                }
-
-                // Priority 4.5: Power Spawn Filling
-                if (!target) {
-                    const powerSpawn = creep.room.find(FIND_MY_STRUCTURES, {
-                        filter: s => s.structureType === STRUCTURE_POWER_SPAWN
-                    })[0] as StructurePowerSpawn | undefined;
-
-                    if (powerSpawn) {
-                        // Check Power first
-                        if (powerSpawn.store.getFreeCapacity(RESOURCE_POWER) > 0) {
-                            let source: StructureStorage | StructureTerminal | null = null;
-                            if (storage && storage.store[RESOURCE_POWER] > 0) {
-                                source = storage;
-                            } else if (terminal && terminal.store[RESOURCE_POWER] > 0) {
-                                source = terminal;
-                            }
-                            if (source) {
-                                target = source;
-                                resourceToFetch = RESOURCE_POWER;
-                                creep.memory.deliveryTargetId = powerSpawn.id;
-                            }
-                        }
-                        // Check Energy second
-                        if (!target && powerSpawn.store.getFreeCapacity(RESOURCE_ENERGY) > 0) {
-                            let source: StructureStorage | StructureTerminal | null = null;
-                            if (storage && storage.store[RESOURCE_ENERGY] > 0) {
-                                source = storage;
-                            } else if (terminal && terminal.store[RESOURCE_ENERGY] > 0) {
-                                source = terminal;
-                            }
-                            if (source) {
-                                target = source;
-                                resourceToFetch = RESOURCE_ENERGY;
-                                creep.memory.deliveryTargetId = powerSpawn.id;
-                            }
-                        }
                     }
                 }
             }
