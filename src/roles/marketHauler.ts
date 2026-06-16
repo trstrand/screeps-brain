@@ -138,8 +138,13 @@ export const roleMarketHauler: RoleHandler = {
 
                 // Priority 2: Storage (Default for minerals from extractors or canceled terminal transfers)
                 if (!delivered && storage) {
-                    if (creep.transfer(storage, carrying) === ERR_NOT_IN_RANGE) {
+                    const transferResult = creep.transfer(storage, carrying);
+                    if (transferResult === ERR_NOT_IN_RANGE) {
                         moveWithSweeper(creep, storage, { visualizePathStyle: { stroke: '#ffffff' } });
+                    } else if (transferResult === ERR_FULL && terminal && terminal.store.getFreeCapacity() > 0) {
+                        if (creep.transfer(terminal, carrying) === ERR_NOT_IN_RANGE) {
+                            moveWithSweeper(creep, terminal, { visualizePathStyle: { stroke: '#00ffff' } });
+                        }
                     }
                 }
             }
@@ -338,7 +343,21 @@ export const roleMarketHauler: RoleHandler = {
                     if ('amount' in target) {
                         creep.pickup(target);
                     } else {
-                        creep.withdraw(target, resourceToFetch);
+                        let amount: number | undefined = undefined;
+                        if (creep.memory.deliveryTargetId) {
+                            const deliveryTarget = Game.getObjectById(creep.memory.deliveryTargetId) as any;
+                            if (deliveryTarget && deliveryTarget.store) {
+                                const freeSpace = deliveryTarget.store.getFreeCapacity(resourceToFetch);
+                                if (freeSpace !== null && freeSpace !== undefined) {
+                                    amount = Math.min(creep.store.getFreeCapacity(resourceToFetch), freeSpace);
+                                }
+                            }
+                        }
+                        if (amount !== undefined && amount > 0) {
+                            creep.withdraw(target, resourceToFetch, amount);
+                        } else {
+                            creep.withdraw(target, resourceToFetch);
+                        }
                     }
                 } else {
                     moveWithSweeper(creep, target, { visualizePathStyle: { stroke: '#ffaa00' } });

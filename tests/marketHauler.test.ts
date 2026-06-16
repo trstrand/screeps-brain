@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.hoisted(() => {
     (globalThis as any).OK = 0;
     (globalThis as any).ERR_NOT_IN_RANGE = -9;
+    (globalThis as any).ERR_FULL = -8;
     (globalThis as any).RESOURCE_ENERGY = 'energy';
     (globalThis as any).FIND_MY_STRUCTURES = 102;
     (globalThis as any).FIND_DROPPED_RESOURCES = 106;
@@ -11,6 +12,7 @@ vi.hoisted(() => {
     (globalThis as any).FIND_RUINS = 118;
     (globalThis as any).STRUCTURE_EXTRACTOR = 'extractor';
     (globalThis as any).STRUCTURE_TOWER = 'tower';
+    (globalThis as any).STRUCTURE_POWER_SPAWN = 'powerSpawn';
     (globalThis as any).RESOURCE_POWER = 'power';
     (globalThis as any).RESOURCE_OPS = 'ops';
 });
@@ -403,6 +405,63 @@ describe('Role: MarketHauler', () => {
             roleMarketHauler.run(mockCreep);
 
             expect(mockCreep.memory.recycle).toBeUndefined();
+        });
+
+        it('should limit withdraw amount to delivery target free capacity', () => {
+            mockCreep.memory.working = false;
+            mockCreep.store.getUsedCapacity.mockReturnValue(0);
+            mockCreep.store.getFreeCapacity.mockReturnValue(1600);
+            // Power spawn only needs 100 energy
+            mockPowerSpawn.store.getFreeCapacity = vi.fn().mockImplementation((res) => {
+                if (res === 'power') return 0;
+                if (res === 'energy') return 100;
+                return 0;
+            });
+            mockStorage.store.energy = 10000;
+            mockStorage.store.power = 0;
+
+            // Set up creep to be adjacent to storage
+            mockCreep.pos.isNearTo = vi.fn().mockReturnValue(true);
+            mockCreep.withdraw = vi.fn().mockReturnValue(OK);
+
+            (globalThis as any).Game.getObjectById = vi.fn().mockImplementation((id) => {
+                if (id === 'power_spawn1') return mockPowerSpawn;
+                return null;
+            });
+
+            roleMarketHauler.run(mockCreep);
+
+            // Should withdraw only 100 (the power spawn's free capacity), not 1600
+            expect(mockCreep.withdraw).toHaveBeenCalledWith(mockStorage, 'energy', 100);
+        });
+
+        it('should fall back to terminal when storage is full during delivery', () => {
+            mockCreep.memory.working = true;
+            mockCreep.store.getUsedCapacity.mockReturnValue(200);
+            mockCreep.store.energy = 200;
+            mockCreep.transfer = vi.fn().mockImplementation((target) => {
+                if (target === mockStorage) return -8; // ERR_FULL
+                return OK;
+            });
+
+            const mockTerminal = {
+                id: 'terminal1' as Id<any>,
+                structureType: 'terminal',
+                store: {
+                    energy: 0,
+                    getFreeCapacity: vi.fn().mockReturnValue(5000)
+                }
+            };
+
+            mockCreep.room.terminal = mockTerminal as any;
+            mockCreep.room.storage = mockStorage as any;
+            mockCreep.room.find = vi.fn().mockReturnValue([]);
+
+            roleMarketHauler.run(mockCreep);
+
+            // Should attempt storage first, then fall back to terminal
+            expect(mockCreep.transfer).toHaveBeenCalledWith(mockStorage, 'energy');
+            expect(mockCreep.transfer).toHaveBeenCalledWith(mockTerminal, 'energy');
         });
     });
 });
